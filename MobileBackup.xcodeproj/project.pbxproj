@@ -16,6 +16,14 @@
 		EE65EF8F1A19E977008BFAF5 /* service.c in Sources */ = {isa = PBXBuildFile; fileRef = EE65EF8D1A19E977008BFAF5 /* service.c */; };
 		EE65EF921A19E98F008BFAF5 /* idevice.c in Sources */ = {isa = PBXBuildFile; fileRef = EE65EF901A19E98F008BFAF5 /* idevice.c */; };
 		EE65EFB11A19EDE3008BFAF5 /* libssl.dylib in Frameworks */ = {isa = PBXBuildFile; fileRef = EE65EF931A19EA02008BFAF5 /* libssl.dylib */; };
+		EE65EFB21A19F20D008BFAF5 /* debug.c in Sources */ = {isa = PBXBuildFile; fileRef = EE65EFA41A19EADA008BFAF5 /* debug.c */; };
+		EE65EFB31A19F20D008BFAF5 /* socket.c in Sources */ = {isa = PBXBuildFile; fileRef = EE65EFA61A19EADA008BFAF5 /* socket.c */; };
+		EE65EFB41A19F20D008BFAF5 /* thread.c in Sources */ = {isa = PBXBuildFile; fileRef = EE65EFA81A19EADA008BFAF5 /* thread.c */; };
+		EE65EFB51A19F20D008BFAF5 /* userpref.c in Sources */ = {isa = PBXBuildFile; fileRef = EE65EFAA1A19EADA008BFAF5 /* userpref.c */; };
+		EE65EFB61A19F20D008BFAF5 /* utils.c in Sources */ = {isa = PBXBuildFile; fileRef = EE65EFAC1A19EADA008BFAF5 /* utils.c */; };
+		EE65EFB91A19F379008BFAF5 /* lockdown.c in Sources */ = {isa = PBXBuildFile; fileRef = EE65EFB71A19F379008BFAF5 /* lockdown.c */; };
+		EE65EFBC1A19F636008BFAF5 /* libusb-1.0.a in Frameworks */ = {isa = PBXBuildFile; fileRef = EE65EFBB1A19F636008BFAF5 /* libusb-1.0.a */; };
+		EE65EFBE1A19F652008BFAF5 /* libusbmuxd.a in Frameworks */ = {isa = PBXBuildFile; fileRef = EE65EFBD1A19F652008BFAF5 /* libusbmuxd.a */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -57,7 +65,11 @@
 		EE65EFAC1A19EADA008BFAF5 /* utils.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = utils.c; sourceTree = "<group>"; };
 		EE65EFAD1A19EADA008BFAF5 /* utils.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = utils.h; sourceTree = "<group>"; };
 		EE65EFAE1A19EB5E008BFAF5 /* endianness.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = endianness.h; sourceTree = "<group>"; };
-		EE65EFAF1A19EDC7008BFAF5 /* libssl.0.9.7.dylib */ = {isa = PBXFileReference; lastKnownFileType = "compiled.mach-o.dylib"; name = libssl.0.9.7.dylib; path = usr/lib/libssl.0.9.7.dylib; sourceTree = SDKROOT; };
+		EE65EFB71A19F379008BFAF5 /* lockdown.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = lockdown.c; sourceTree = "<group>"; };
+		EE65EFB81A19F379008BFAF5 /* lockdown.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = lockdown.h; sourceTree = "<group>"; };
+		EE65EFBA1A19F3A2008BFAF5 /* asprintf.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = asprintf.h; sourceTree = "<group>"; };
+		EE65EFBB1A19F636008BFAF5 /* libusb-1.0.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; name = "libusb-1.0.a"; path = "../../../../../../usr/local/lib/libusb-1.0.a"; sourceTree = "<group>"; };
+		EE65EFBD1A19F652008BFAF5 /* libusbmuxd.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; name = libusbmuxd.a; path = ../../../../../../usr/local/lib/libusbmuxd.a; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -65,6 +77,8 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				EE65EFBE1A19F652008BFAF5 /* libusbmuxd.a in Frameworks */,
+				EE65EFBC1A19F636008BFAF5 /* libusb-1.0.a in Frameworks */,
 				EE65EFB11A19EDE3008BFAF5 /* libssl.dylib in Frameworks */,
 				EE65EF851A19E895008BFAF5 /* libplist.a in Frameworks */,
 				EE65EF801A19E2FF008BFAF5 /* libprotobuf.a in Frameworks */,
@@ -77,7 +91,8 @@
 		EE65EF681A19DCCA008BFAF5 = {
 			isa = PBXGroup;
 			children = (
-				EE65EFAF1A19EDC7008BFAF5 /* libssl.0.9.7.dylib */,
+				EE65EFBD1A19F652008BFAF5 /* libusbmuxd.a */,
+				EE65EFBB1A19F636008BFAF5 /* libusb-1.0.a */,
 				EE65EF931A19EA02008BFAF5 /* libssl.dylib */,
 				EE65EF841A19E895008BFAF5 /* libplist.a */,
 				EE65EF7F1A19E2FF008BFAF5 /* libprotobuf.a */,
@@ -101,6 +116,9 @@
 				EE65EFAE1A19EB5E008BFAF5 /* endianness.h */,
 				EE65EF881A19E92A008BFAF5 /* device_link_service.c */,
 				EE65EF901A19E98F008BFAF5 /* idevice.c */,
+				EE65EFB71A19F379008BFAF5 /* lockdown.c */,
+				EE65EFBA1A19F3A2008BFAF5 /* asprintf.h */,
+				EE65EFB81A19F379008BFAF5 /* lockdown.h */,
 				EE65EF911A19E98F008BFAF5 /* idevice.h */,
 				EE65EF861A19E8EA008BFAF5 /* mobilebackup2.h */,
 				EE65EF8D1A19E977008BFAF5 /* service.c */,
@@ -188,6 +206,12 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				EE65EFB91A19F379008BFAF5 /* lockdown.c in Sources */,
+				EE65EFB21A19F20D008BFAF5 /* debug.c in Sources */,
+				EE65EFB31A19F20D008BFAF5 /* socket.c in Sources */,
+				EE65EFB41A19F20D008BFAF5 /* thread.c in Sources */,
+				EE65EFB51A19F20D008BFAF5 /* userpref.c in Sources */,
+				EE65EFB61A19F20D008BFAF5 /* utils.c in Sources */,
 				EE65EF8C1A19E93E008BFAF5 /* property_list_service.c in Sources */,
 				EE65EF891A19E92A008BFAF5 /* device_link_service.c in Sources */,
 				EE65EF7C1A19DE3A008BFAF5 /* mobilebackup2.c in Sources */,
@@ -277,7 +301,10 @@
 		EE65EF791A19DCCA008BFAF5 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				GCC_PREPROCESSOR_DEFINITIONS = HAVE_OPENSSL;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					HAVE_OPENSSL,
+					HAVE_STPCPY,
+				);
 				HEADER_SEARCH_PATHS = (
 					"$(inherited)",
 					/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/include,
@@ -296,7 +323,10 @@
 		EE65EF7A1A19DCCA008BFAF5 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				GCC_PREPROCESSOR_DEFINITIONS = HAVE_OPENSSL;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					HAVE_OPENSSL,
+					HAVE_STPCPY,
+				);
 				HEADER_SEARCH_PATHS = (
 					"$(inherited)",
 					/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/include,
@@ -331,6 +361,7 @@
 				EE65EF7A1A19DCCA008BFAF5 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
 	};
