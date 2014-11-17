@@ -67,47 +67,43 @@ static unsigned long id_function(void)
 
 static void internal_idevice_init(void)
 {
-//#ifdef HAVE_OPENSSL
-//	int i;
-//	SSL_library_init();
-//
-//	mutex_buf = malloc(CRYPTO_num_locks() * sizeof(mutex_t));
-//	if (!mutex_buf)
-//		return;
-//	for (i = 0; i < CRYPTO_num_locks(); i++)
-//		cmn_mutex_init(&mutex_buf[i]);
-//
-//	CRYPTO_set_id_callback(id_function);
-//	CRYPTO_set_locking_callback(locking_function);
-//#else
-//	gnutls_global_init();
-//#endif
+	int i;
+	SSL_library_init();
+
+	mutex_buf = malloc(CRYPTO_num_locks() * sizeof(mutex_t));
+	if (!mutex_buf)
+		return;
+	for (i = 0; i < CRYPTO_num_locks(); i++)
+		cmn_mutex_init(&mutex_buf[i]);
+
+	CRYPTO_set_id_callback(id_function);
+	CRYPTO_set_locking_callback(locking_function);
 }
 
 static void internal_idevice_deinit(void)
 {
-//#ifdef HAVE_OPENSSL
-//	int i;
-//	if (mutex_buf) {
-//		CRYPTO_set_id_callback(NULL);
-//		CRYPTO_set_locking_callback(NULL);
-//		for (i = 0; i < CRYPTO_num_locks(); i++)
-//			cmn_mutex_destroy(&mutex_buf[i]);
-//		free(mutex_buf);
-//		mutex_buf = NULL;
-//	}
-//
-//	EVP_cleanup();
-//	CRYPTO_cleanup_all_ex_data();
-//	sk_SSL_COMP_free(SSL_COMP_get_compression_methods());
-//#ifdef HAVE_ERR_REMOVE_THREAD_STATE
-//	ERR_remove_thread_state(NULL);
-//#else
-//	ERR_remove_state(0);
-//#endif
-//#else
-//	gnutls_global_deinit();
-//#endif
+#ifdef HAVE_OPENSSL
+	int i;
+	if (mutex_buf) {
+		CRYPTO_set_id_callback(NULL);
+		CRYPTO_set_locking_callback(NULL);
+		for (i = 0; i < CRYPTO_num_locks(); i++)
+			cmn_mutex_destroy(&mutex_buf[i]);
+		free(mutex_buf);
+		mutex_buf = NULL;
+	}
+
+	EVP_cleanup();
+	CRYPTO_cleanup_all_ex_data();
+	sk_SSL_COMP_free(SSL_COMP_get_compression_methods());
+#ifdef HAVE_ERR_REMOVE_THREAD_STATE
+	ERR_remove_thread_state(NULL);
+#else
+	ERR_remove_state(0);
+#endif
+#else
+	gnutls_global_deinit();
+#endif
 }
 
 static thread_once_t init_once = THREAD_ONCE_INIT;
@@ -336,24 +332,24 @@ static idevice_error_t internal_connection_send(idevice_connection_t connection,
 
 LIBIMOBILEDEVICE_API idevice_error_t idevice_connection_send(idevice_connection_t connection, const char *data, uint32_t len, uint32_t *sent_bytes)
 {
-//	if (!connection || !data || (connection->ssl_data && !connection->ssl_data->session)) {
-//		return IDEVICE_E_INVALID_ARG;
-//	}
-//
-//	if (connection->ssl_data) {
-//#ifdef HAVE_OPENSSL
-//		int sent = SSL_write(connection->ssl_data->session, (const void*)data, (int)len);
-//		debug_info("SSL_write %d, sent %d", len, sent);
-//#else
-//		ssize_t sent = gnutls_record_send(connection->ssl_data->session, (void*)data, (size_t)len);
-//#endif
-//		if ((uint32_t)sent == (uint32_t)len) {
-//			*sent_bytes = sent;
-//			return IDEVICE_E_SUCCESS;
-//		}
-//		*sent_bytes = 0;
-//		return IDEVICE_E_SSL_ERROR;
-//	}
+	if (!connection || !data || (connection->ssl_data && !connection->ssl_data->session)) {
+		return IDEVICE_E_INVALID_ARG;
+	}
+
+	if (connection->ssl_data) {
+#ifdef HAVE_OPENSSL
+		int sent = SSL_write(connection->ssl_data->session, (const void*)data, (int)len);
+		debug_info("SSL_write %d, sent %d", len, sent);
+#else
+		ssize_t sent = gnutls_record_send(connection->ssl_data->session, (void*)data, (size_t)len);
+#endif
+		if ((uint32_t)sent == (uint32_t)len) {
+			*sent_bytes = sent;
+			return IDEVICE_E_SUCCESS;
+		}
+		*sent_bytes = 0;
+		return IDEVICE_E_SSL_ERROR;
+	}
 	return internal_connection_send(connection, data, len, sent_bytes);
 }
 
@@ -382,32 +378,32 @@ static idevice_error_t internal_connection_receive_timeout(idevice_connection_t 
 
 LIBIMOBILEDEVICE_API idevice_error_t idevice_connection_receive_timeout(idevice_connection_t connection, char *data, uint32_t len, uint32_t *recv_bytes, unsigned int timeout)
 {
-//	if (!connection || (connection->ssl_data && !connection->ssl_data->session)) {
-//		return IDEVICE_E_INVALID_ARG;
-//	}
-//
-//	if (connection->ssl_data) {
-//#ifdef HAVE_OPENSSL
-//		uint32_t received = 0;
-//		while (received < len) {
-//			int r = SSL_read(connection->ssl_data->session, (void*)((char*)(data+received)), (int)len-received);
-//			if (r > 0) {
-//				received += r;
-//			} else {
-//				break;
-//			}
-//		}
-//		debug_info("SSL_read %d, received %d", len, received);
-//#else
-//		ssize_t received = gnutls_record_recv(connection->ssl_data->session, (void*)data, (size_t)len);
-//#endif
-//		if (received > 0) {
-//			*recv_bytes = received;
-//			return IDEVICE_E_SUCCESS;
-//		}
-//		*recv_bytes = 0;
-//		return IDEVICE_E_SSL_ERROR;
-//	}
+	if (!connection || (connection->ssl_data && !connection->ssl_data->session)) {
+		return IDEVICE_E_INVALID_ARG;
+	}
+
+	if (connection->ssl_data) {
+#ifdef HAVE_OPENSSL
+		uint32_t received = 0;
+		while (received < len) {
+			int r = SSL_read(connection->ssl_data->session, (void*)((char*)(data+received)), (int)len-received);
+			if (r > 0) {
+				received += r;
+			} else {
+				break;
+			}
+		}
+		debug_info("SSL_read %d, received %d", len, received);
+#else
+		ssize_t received = gnutls_record_recv(connection->ssl_data->session, (void*)data, (size_t)len);
+#endif
+		if (received > 0) {
+			*recv_bytes = received;
+			return IDEVICE_E_SUCCESS;
+		}
+		*recv_bytes = 0;
+		return IDEVICE_E_SSL_ERROR;
+	}
 	return internal_connection_receive_timeout(connection, data, len, recv_bytes, timeout);
 }
 
@@ -436,24 +432,24 @@ static idevice_error_t internal_connection_receive(idevice_connection_t connecti
 
 LIBIMOBILEDEVICE_API idevice_error_t idevice_connection_receive(idevice_connection_t connection, char *data, uint32_t len, uint32_t *recv_bytes)
 {
-//	if (!connection || (connection->ssl_data && !connection->ssl_data->session)) {
-//		return IDEVICE_E_INVALID_ARG;
-//	}
-//
-//	if (connection->ssl_data) {
-//#ifdef HAVE_OPENSSL
-//		int received = SSL_read(connection->ssl_data->session, (void*)data, (int)len);
-//		debug_info("SSL_read %d, received %d", len, received);
-//#else
-//		ssize_t received = gnutls_record_recv(connection->ssl_data->session, (void*)data, (size_t)len);
-//#endif
-//		if (received > 0) {
-//			*recv_bytes = received;
-//			return IDEVICE_E_SUCCESS;
-//		}
-//		*recv_bytes = 0;
-//		return IDEVICE_E_SSL_ERROR;
-//	}
+	if (!connection || (connection->ssl_data && !connection->ssl_data->session)) {
+		return IDEVICE_E_INVALID_ARG;
+	}
+
+	if (connection->ssl_data) {
+#ifdef HAVE_OPENSSL
+		int received = SSL_read(connection->ssl_data->session, (void*)data, (int)len);
+		debug_info("SSL_read %d, received %d", len, received);
+#else
+		ssize_t received = gnutls_record_recv(connection->ssl_data->session, (void*)data, (size_t)len);
+#endif
+		if (received > 0) {
+			*recv_bytes = received;
+			return IDEVICE_E_SUCCESS;
+		}
+		*recv_bytes = 0;
+		return IDEVICE_E_SSL_ERROR;
+	}
 	return internal_connection_receive(connection, data, len, recv_bytes);
 }
 
@@ -549,36 +545,36 @@ static ssize_t internal_ssl_write(gnutls_transport_ptr_t transport, char *buffer
  */
 static void internal_ssl_cleanup(ssl_data_t ssl_data)
 {
-//	if (!ssl_data)
-//		return;
-//
-//#ifdef HAVE_OPENSSL
-//	if (ssl_data->session) {
-//		SSL_free(ssl_data->session);
-//	}
-//	if (ssl_data->ctx) {
-//		SSL_CTX_free(ssl_data->ctx);
-//	}
-//#else
-//	if (ssl_data->session) {
-//		gnutls_deinit(ssl_data->session);
-//	}
-//	if (ssl_data->certificate) {
-//		gnutls_certificate_free_credentials(ssl_data->certificate);
-//	}
-//	if (ssl_data->root_cert) {
-//		gnutls_x509_crt_deinit(ssl_data->root_cert);
-//	}
-//	if (ssl_data->host_cert) {
-//		gnutls_x509_crt_deinit(ssl_data->host_cert);
-//	}
-//	if (ssl_data->root_privkey) {
-//		gnutls_x509_privkey_deinit(ssl_data->root_privkey);
-//	}
-//	if (ssl_data->host_privkey) {
-//		gnutls_x509_privkey_deinit(ssl_data->host_privkey);
-//	}
-//#endif
+	if (!ssl_data)
+		return;
+
+#ifdef HAVE_OPENSSL
+	if (ssl_data->session) {
+		SSL_free(ssl_data->session);
+	}
+	if (ssl_data->ctx) {
+		SSL_CTX_free(ssl_data->ctx);
+	}
+#else
+	if (ssl_data->session) {
+		gnutls_deinit(ssl_data->session);
+	}
+	if (ssl_data->certificate) {
+		gnutls_certificate_free_credentials(ssl_data->certificate);
+	}
+	if (ssl_data->root_cert) {
+		gnutls_x509_crt_deinit(ssl_data->root_cert);
+	}
+	if (ssl_data->host_cert) {
+		gnutls_x509_crt_deinit(ssl_data->host_cert);
+	}
+	if (ssl_data->root_privkey) {
+		gnutls_x509_privkey_deinit(ssl_data->root_privkey);
+	}
+	if (ssl_data->host_privkey) {
+		gnutls_x509_privkey_deinit(ssl_data->host_privkey);
+	}
+#endif
 }
 
 #ifdef HAVE_OPENSSL
@@ -642,146 +638,145 @@ static int internal_cert_callback(gnutls_session_t session, const gnutls_datum_t
 
 LIBIMOBILEDEVICE_API idevice_error_t idevice_connection_enable_ssl(idevice_connection_t connection)
 {
-  int ret = 0;
-//	if (!connection || connection->ssl_data)
-//		return IDEVICE_E_INVALID_ARG;
-//
-//	idevice_error_t ret = IDEVICE_E_SSL_ERROR;
-//	uint32_t return_me = 0;
-//	plist_t pair_record = NULL;
-//
-//	userpref_read_pair_record(connection->udid, &pair_record);
-//	if (!pair_record) {
-//		debug_info("ERROR: Failed enabling SSL. Unable to read pair record for udid %s.", connection->udid);
-//		return ret;
-//	}
-//
-//#ifdef HAVE_OPENSSL
-//	key_data_t root_cert = { NULL, 0 };
-//	key_data_t root_privkey = { NULL, 0 };
-//
-//	pair_record_import_crt_with_name(pair_record, USERPREF_ROOT_CERTIFICATE_KEY, &root_cert);
-//	pair_record_import_key_with_name(pair_record, USERPREF_ROOT_PRIVATE_KEY_KEY, &root_privkey);
-//
-//	if (pair_record)
-//		plist_free(pair_record);
-//
-//	BIO *ssl_bio = BIO_new(BIO_s_socket());
-//	if (!ssl_bio) {
-//		debug_info("ERROR: Could not create SSL bio.");
-//		return ret;
-//	}
-//	BIO_set_fd(ssl_bio, (int)(long)connection->data, BIO_NOCLOSE);
-//
-//	SSL_CTX *ssl_ctx = SSL_CTX_new(SSLv3_method());
-//	if (ssl_ctx == NULL) {
-//		debug_info("ERROR: Could not create SSL context.");
-//		BIO_free(ssl_bio);
-//		return ret;
-//	}
-//
-//	BIO* membp;
-//	X509* rootCert = NULL;
-//	membp = BIO_new_mem_buf(root_cert.data, root_cert.size);
-//	PEM_read_bio_X509(membp, &rootCert, NULL, NULL);
-//	BIO_free(membp);
-//	if (SSL_CTX_use_certificate(ssl_ctx, rootCert) != 1) {
-//		debug_info("WARNING: Could not load RootCertificate");
-//	}
-//	X509_free(rootCert);
-//	free(root_cert.data);
-//
-//	RSA* rootPrivKey = NULL;
-//	membp = BIO_new_mem_buf(root_privkey.data, root_privkey.size);
-//	PEM_read_bio_RSAPrivateKey(membp, &rootPrivKey, NULL, NULL);
-//	BIO_free(membp);
-//	if (SSL_CTX_use_RSAPrivateKey(ssl_ctx, rootPrivKey) != 1) {
-//		debug_info("WARNING: Could not load RootPrivateKey");
-//	}
-//	RSA_free(rootPrivKey);
-//	free(root_privkey.data);
-//
-//	SSL *ssl = SSL_new(ssl_ctx);
-//	if (!ssl) {
-//		debug_info("ERROR: Could not create SSL object");
-//		BIO_free(ssl_bio);
-//		SSL_CTX_free(ssl_ctx);
-//		return ret;
-//	}
-//	SSL_set_connect_state(ssl);
-//	SSL_set_verify(ssl, 0, ssl_verify_callback);
-//	SSL_set_bio(ssl, ssl_bio, ssl_bio);
-//
-//	return_me = SSL_do_handshake(ssl);
-//	if (return_me != 1) {
-//		debug_info("ERROR in SSL_do_handshake: %s", errorstring(SSL_get_error(ssl, return_me)));
-//		SSL_free(ssl);
-//		SSL_CTX_free(ssl_ctx);
-//	} else {
-//		ssl_data_t ssl_data_loc = (ssl_data_t)malloc(sizeof(struct ssl_data_private));
-//		ssl_data_loc->session = ssl;
-//		ssl_data_loc->ctx = ssl_ctx;
-//		connection->ssl_data = ssl_data_loc;
-//		ret = IDEVICE_E_SUCCESS;
-//		debug_info("SSL mode enabled, cipher: %s", SSL_get_cipher(ssl));
-//	}
-//	/* required for proper multi-thread clean up to prevent leaks */
-//#ifdef HAVE_ERR_REMOVE_THREAD_STATE
-//	ERR_remove_thread_state(NULL);
-//#else
-//	ERR_remove_state(0);
-//#endif
-//#else
-//	ssl_data_t ssl_data_loc = (ssl_data_t)malloc(sizeof(struct ssl_data_private));
-//
-//	/* Set up GnuTLS... */
-//	debug_info("enabling SSL mode");
-//	errno = 0;
-//	gnutls_certificate_allocate_credentials(&ssl_data_loc->certificate);
-//	gnutls_certificate_client_set_retrieve_function(ssl_data_loc->certificate, internal_cert_callback);
-//	gnutls_init(&ssl_data_loc->session, GNUTLS_CLIENT);
-//	gnutls_priority_set_direct(ssl_data_loc->session, "NONE:+VERS-SSL3.0:+ANON-DH:+RSA:+AES-128-CBC:+AES-256-CBC:+SHA1:+MD5:+COMP-NULL", NULL);
-//	gnutls_credentials_set(ssl_data_loc->session, GNUTLS_CRD_CERTIFICATE, ssl_data_loc->certificate);
-//	gnutls_session_set_ptr(ssl_data_loc->session, ssl_data_loc);
-//
-//	gnutls_x509_crt_init(&ssl_data_loc->root_cert);
-//	gnutls_x509_crt_init(&ssl_data_loc->host_cert);
-//	gnutls_x509_privkey_init(&ssl_data_loc->root_privkey);
-//	gnutls_x509_privkey_init(&ssl_data_loc->host_privkey);
-//
-//	pair_record_import_crt_with_name(pair_record, USERPREF_ROOT_CERTIFICATE_KEY, ssl_data_loc->root_cert);
-//	pair_record_import_crt_with_name(pair_record, USERPREF_HOST_CERTIFICATE_KEY, ssl_data_loc->host_cert);
-//	pair_record_import_key_with_name(pair_record, USERPREF_ROOT_PRIVATE_KEY_KEY, ssl_data_loc->root_privkey);
-//	pair_record_import_key_with_name(pair_record, USERPREF_HOST_PRIVATE_KEY_KEY, ssl_data_loc->host_privkey);
-//
-//	if (pair_record)
-//		plist_free(pair_record);
-//
-//	debug_info("GnuTLS step 1...");
-//	gnutls_transport_set_ptr(ssl_data_loc->session, (gnutls_transport_ptr_t)connection);
-//	debug_info("GnuTLS step 2...");
-//	gnutls_transport_set_push_function(ssl_data_loc->session, (gnutls_push_func) & internal_ssl_write);
-//	debug_info("GnuTLS step 3...");
-//	gnutls_transport_set_pull_function(ssl_data_loc->session, (gnutls_pull_func) & internal_ssl_read);
-//	debug_info("GnuTLS step 4 -- now handshaking...");
-//	if (errno) {
-//		debug_info("WARNING: errno says %s before handshake!", strerror(errno));
-//	}
-//	return_me = gnutls_handshake(ssl_data_loc->session);
-//	debug_info("GnuTLS handshake done...");
-//
-//	if (return_me != GNUTLS_E_SUCCESS) {
-//		internal_ssl_cleanup(ssl_data_loc);
-//		free(ssl_data_loc);
-//		debug_info("GnuTLS reported something wrong.");
-//		gnutls_perror(return_me);
-//		debug_info("oh.. errno says %s", strerror(errno));
-//	} else {
-//		connection->ssl_data = ssl_data_loc;
-//		ret = IDEVICE_E_SUCCESS;
-//		debug_info("SSL mode enabled");
-//	}
-//#endif
+	if (!connection || connection->ssl_data)
+		return IDEVICE_E_INVALID_ARG;
+
+	idevice_error_t ret = IDEVICE_E_SSL_ERROR;
+	uint32_t return_me = 0;
+	plist_t pair_record = NULL;
+
+	userpref_read_pair_record(connection->udid, &pair_record);
+	if (!pair_record) {
+		debug_info("ERROR: Failed enabling SSL. Unable to read pair record for udid %s.", connection->udid);
+		return ret;
+	}
+
+#ifdef HAVE_OPENSSL
+	key_data_t root_cert = { NULL, 0 };
+	key_data_t root_privkey = { NULL, 0 };
+
+	pair_record_import_crt_with_name(pair_record, USERPREF_ROOT_CERTIFICATE_KEY, &root_cert);
+	pair_record_import_key_with_name(pair_record, USERPREF_ROOT_PRIVATE_KEY_KEY, &root_privkey);
+
+	if (pair_record)
+		plist_free(pair_record);
+
+	BIO *ssl_bio = BIO_new(BIO_s_socket());
+	if (!ssl_bio) {
+		debug_info("ERROR: Could not create SSL bio.");
+		return ret;
+	}
+	BIO_set_fd(ssl_bio, (int)(long)connection->data, BIO_NOCLOSE);
+
+	SSL_CTX *ssl_ctx = SSL_CTX_new(SSLv3_method());
+	if (ssl_ctx == NULL) {
+		debug_info("ERROR: Could not create SSL context.");
+		BIO_free(ssl_bio);
+		return ret;
+	}
+
+	BIO* membp;
+	X509* rootCert = NULL;
+	membp = BIO_new_mem_buf(root_cert.data, root_cert.size);
+	PEM_read_bio_X509(membp, &rootCert, NULL, NULL);
+	BIO_free(membp);
+	if (SSL_CTX_use_certificate(ssl_ctx, rootCert) != 1) {
+		debug_info("WARNING: Could not load RootCertificate");
+	}
+	X509_free(rootCert);
+	free(root_cert.data);
+
+	RSA* rootPrivKey = NULL;
+	membp = BIO_new_mem_buf(root_privkey.data, root_privkey.size);
+	PEM_read_bio_RSAPrivateKey(membp, &rootPrivKey, NULL, NULL);
+	BIO_free(membp);
+	if (SSL_CTX_use_RSAPrivateKey(ssl_ctx, rootPrivKey) != 1) {
+		debug_info("WARNING: Could not load RootPrivateKey");
+	}
+	RSA_free(rootPrivKey);
+	free(root_privkey.data);
+
+	SSL *ssl = SSL_new(ssl_ctx);
+	if (!ssl) {
+		debug_info("ERROR: Could not create SSL object");
+		BIO_free(ssl_bio);
+		SSL_CTX_free(ssl_ctx);
+		return ret;
+	}
+	SSL_set_connect_state(ssl);
+	SSL_set_verify(ssl, 0, ssl_verify_callback);
+	SSL_set_bio(ssl, ssl_bio, ssl_bio);
+
+	return_me = SSL_do_handshake(ssl);
+	if (return_me != 1) {
+		debug_info("ERROR in SSL_do_handshake: %s", errorstring(SSL_get_error(ssl, return_me)));
+		SSL_free(ssl);
+		SSL_CTX_free(ssl_ctx);
+	} else {
+		ssl_data_t ssl_data_loc = (ssl_data_t)malloc(sizeof(struct ssl_data_private));
+		ssl_data_loc->session = ssl;
+		ssl_data_loc->ctx = ssl_ctx;
+		connection->ssl_data = ssl_data_loc;
+		ret = IDEVICE_E_SUCCESS;
+		debug_info("SSL mode enabled, cipher: %s", SSL_get_cipher(ssl));
+	}
+	/* required for proper multi-thread clean up to prevent leaks */
+#ifdef HAVE_ERR_REMOVE_THREAD_STATE
+	ERR_remove_thread_state(NULL);
+#else
+	ERR_remove_state(0);
+#endif
+#else
+	ssl_data_t ssl_data_loc = (ssl_data_t)malloc(sizeof(struct ssl_data_private));
+
+	/* Set up GnuTLS... */
+	debug_info("enabling SSL mode");
+	errno = 0;
+	gnutls_certificate_allocate_credentials(&ssl_data_loc->certificate);
+	gnutls_certificate_client_set_retrieve_function(ssl_data_loc->certificate, internal_cert_callback);
+	gnutls_init(&ssl_data_loc->session, GNUTLS_CLIENT);
+	gnutls_priority_set_direct(ssl_data_loc->session, "NONE:+VERS-SSL3.0:+ANON-DH:+RSA:+AES-128-CBC:+AES-256-CBC:+SHA1:+MD5:+COMP-NULL", NULL);
+	gnutls_credentials_set(ssl_data_loc->session, GNUTLS_CRD_CERTIFICATE, ssl_data_loc->certificate);
+	gnutls_session_set_ptr(ssl_data_loc->session, ssl_data_loc);
+
+	gnutls_x509_crt_init(&ssl_data_loc->root_cert);
+	gnutls_x509_crt_init(&ssl_data_loc->host_cert);
+	gnutls_x509_privkey_init(&ssl_data_loc->root_privkey);
+	gnutls_x509_privkey_init(&ssl_data_loc->host_privkey);
+
+	pair_record_import_crt_with_name(pair_record, USERPREF_ROOT_CERTIFICATE_KEY, ssl_data_loc->root_cert);
+	pair_record_import_crt_with_name(pair_record, USERPREF_HOST_CERTIFICATE_KEY, ssl_data_loc->host_cert);
+	pair_record_import_key_with_name(pair_record, USERPREF_ROOT_PRIVATE_KEY_KEY, ssl_data_loc->root_privkey);
+	pair_record_import_key_with_name(pair_record, USERPREF_HOST_PRIVATE_KEY_KEY, ssl_data_loc->host_privkey);
+
+	if (pair_record)
+		plist_free(pair_record);
+
+	debug_info("GnuTLS step 1...");
+	gnutls_transport_set_ptr(ssl_data_loc->session, (gnutls_transport_ptr_t)connection);
+	debug_info("GnuTLS step 2...");
+	gnutls_transport_set_push_function(ssl_data_loc->session, (gnutls_push_func) & internal_ssl_write);
+	debug_info("GnuTLS step 3...");
+	gnutls_transport_set_pull_function(ssl_data_loc->session, (gnutls_pull_func) & internal_ssl_read);
+	debug_info("GnuTLS step 4 -- now handshaking...");
+	if (errno) {
+		debug_info("WARNING: errno says %s before handshake!", strerror(errno));
+	}
+	return_me = gnutls_handshake(ssl_data_loc->session);
+	debug_info("GnuTLS handshake done...");
+
+	if (return_me != GNUTLS_E_SUCCESS) {
+		internal_ssl_cleanup(ssl_data_loc);
+		free(ssl_data_loc);
+		debug_info("GnuTLS reported something wrong.");
+		gnutls_perror(return_me);
+		debug_info("oh.. errno says %s", strerror(errno));
+	} else {
+		connection->ssl_data = ssl_data_loc;
+		ret = IDEVICE_E_SUCCESS;
+		debug_info("SSL mode enabled");
+	}
+#endif
 	return ret;
 }
 
