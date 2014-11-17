@@ -25,6 +25,8 @@
 		EE65EFBE1A19F652008BFAF5 /* libusbmuxd.a in Frameworks */ = {isa = PBXBuildFile; fileRef = EE65EFBD1A19F652008BFAF5 /* libusbmuxd.a */; };
 		EE65EFC01A1A0B45008BFAF5 /* libssl.a in Frameworks */ = {isa = PBXBuildFile; fileRef = EE65EFBF1A1A0B45008BFAF5 /* libssl.a */; };
 		EE65EFC21A1A0B6D008BFAF5 /* libcrypto.a in Frameworks */ = {isa = PBXBuildFile; fileRef = EE65EFC11A1A0B6D008BFAF5 /* libcrypto.a */; };
+		EE65EFC51A1A4019008BFAF5 /* afc.c in Sources */ = {isa = PBXBuildFile; fileRef = EE65EFC31A1A4019008BFAF5 /* afc.c */; };
+		EE65EFC81A1A4081008BFAF5 /* notification_proxy.c in Sources */ = {isa = PBXBuildFile; fileRef = EE65EFC61A1A4081008BFAF5 /* notification_proxy.c */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -72,6 +74,10 @@
 		EE65EFBD1A19F652008BFAF5 /* libusbmuxd.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; name = libusbmuxd.a; path = ../../../../../../usr/local/lib/libusbmuxd.a; sourceTree = "<group>"; };
 		EE65EFBF1A1A0B45008BFAF5 /* libssl.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; name = libssl.a; path = ../../../../../../usr/local/Cellar/openssl/1.0.1f/lib/libssl.a; sourceTree = "<group>"; };
 		EE65EFC11A1A0B6D008BFAF5 /* libcrypto.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; name = libcrypto.a; path = ../../../../../../usr/local/Cellar/openssl/1.0.1f/lib/libcrypto.a; sourceTree = "<group>"; };
+		EE65EFC31A1A4019008BFAF5 /* afc.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = afc.c; sourceTree = "<group>"; };
+		EE65EFC41A1A4019008BFAF5 /* afc.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = afc.h; sourceTree = "<group>"; };
+		EE65EFC61A1A4081008BFAF5 /* notification_proxy.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = notification_proxy.c; sourceTree = "<group>"; };
+		EE65EFC71A1A4081008BFAF5 /* notification_proxy.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = notification_proxy.h; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -117,6 +123,10 @@
 		EE65EF731A19DCCA008BFAF5 /* MobileBackup */ = {
 			isa = PBXGroup;
 			children = (
+				EE65EFC31A1A4019008BFAF5 /* afc.c */,
+				EE65EFC41A1A4019008BFAF5 /* afc.h */,
+				EE65EFC61A1A4081008BFAF5 /* notification_proxy.c */,
+				EE65EFC71A1A4081008BFAF5 /* notification_proxy.h */,
 				EE65EFAE1A19EB5E008BFAF5 /* endianness.h */,
 				EE65EF881A19E92A008BFAF5 /* device_link_service.c */,
 				EE65EF901A19E98F008BFAF5 /* idevice.c */,
@@ -210,12 +220,14 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				EE65EFC51A1A4019008BFAF5 /* afc.c in Sources */,
 				EE65EFB91A19F379008BFAF5 /* lockdown.c in Sources */,
 				EE65EFB21A19F20D008BFAF5 /* debug.c in Sources */,
 				EE65EFB31A19F20D008BFAF5 /* socket.c in Sources */,
 				EE65EFB41A19F20D008BFAF5 /* thread.c in Sources */,
 				EE65EFB51A19F20D008BFAF5 /* userpref.c in Sources */,
 				EE65EFB61A19F20D008BFAF5 /* utils.c in Sources */,
+				EE65EFC81A1A4081008BFAF5 /* notification_proxy.c in Sources */,
 				EE65EF8C1A19E93E008BFAF5 /* property_list_service.c in Sources */,
 				EE65EF891A19E92A008BFAF5 /* device_link_service.c in Sources */,
 				EE65EF7C1A19DE3A008BFAF5 /* mobilebackup2.c in Sources */,
