@@ -8,6 +8,14 @@
 
 /* Begin PBXBuildFile section */
 		EE65EF751A19DCCA008BFAF5 /* main.c in Sources */ = {isa = PBXBuildFile; fileRef = EE65EF741A19DCCA008BFAF5 /* main.c */; };
+		EE65EF7C1A19DE3A008BFAF5 /* mobilebackup2.c in Sources */ = {isa = PBXBuildFile; fileRef = EE65EF7B1A19DE3A008BFAF5 /* mobilebackup2.c */; };
+		EE65EF801A19E2FF008BFAF5 /* libprotobuf.a in Frameworks */ = {isa = PBXBuildFile; fileRef = EE65EF7F1A19E2FF008BFAF5 /* libprotobuf.a */; };
+		EE65EF851A19E895008BFAF5 /* libplist.a in Frameworks */ = {isa = PBXBuildFile; fileRef = EE65EF841A19E895008BFAF5 /* libplist.a */; };
+		EE65EF891A19E92A008BFAF5 /* device_link_service.c in Sources */ = {isa = PBXBuildFile; fileRef = EE65EF881A19E92A008BFAF5 /* device_link_service.c */; };
+		EE65EF8C1A19E93E008BFAF5 /* property_list_service.c in Sources */ = {isa = PBXBuildFile; fileRef = EE65EF8A1A19E93E008BFAF5 /* property_list_service.c */; };
+		EE65EF8F1A19E977008BFAF5 /* service.c in Sources */ = {isa = PBXBuildFile; fileRef = EE65EF8D1A19E977008BFAF5 /* service.c */; };
+		EE65EF921A19E98F008BFAF5 /* idevice.c in Sources */ = {isa = PBXBuildFile; fileRef = EE65EF901A19E98F008BFAF5 /* idevice.c */; };
+		EE65EFB11A19EDE3008BFAF5 /* libssl.dylib in Frameworks */ = {isa = PBXBuildFile; fileRef = EE65EF931A19EA02008BFAF5 /* libssl.dylib */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -25,6 +33,31 @@
 /* Begin PBXFileReference section */
 		EE65EF711A19DCCA008BFAF5 /* MobileBackup */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = MobileBackup; sourceTree = BUILT_PRODUCTS_DIR; };
 		EE65EF741A19DCCA008BFAF5 /* main.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = main.c; sourceTree = "<group>"; };
+		EE65EF7B1A19DE3A008BFAF5 /* mobilebackup2.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = mobilebackup2.c; sourceTree = "<group>"; };
+		EE65EF7F1A19E2FF008BFAF5 /* libprotobuf.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; name = libprotobuf.a; path = "../../Home/Frameworks/protobuf-2.5.0/protobuf/lib/libprotobuf.a"; sourceTree = "<group>"; };
+		EE65EF841A19E895008BFAF5 /* libplist.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; name = libplist.a; path = ../../../../../../usr/local/lib/libplist.a; sourceTree = "<group>"; };
+		EE65EF861A19E8EA008BFAF5 /* mobilebackup2.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = mobilebackup2.h; sourceTree = "<group>"; };
+		EE65EF871A19E922008BFAF5 /* device_link_service.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = device_link_service.h; sourceTree = "<group>"; };
+		EE65EF881A19E92A008BFAF5 /* device_link_service.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = device_link_service.c; sourceTree = "<group>"; };
+		EE65EF8A1A19E93E008BFAF5 /* property_list_service.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = property_list_service.c; sourceTree = "<group>"; };
+		EE65EF8B1A19E93E008BFAF5 /* property_list_service.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = property_list_service.h; sourceTree = "<group>"; };
+		EE65EF8D1A19E977008BFAF5 /* service.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = service.c; sourceTree = "<group>"; };
+		EE65EF8E1A19E977008BFAF5 /* service.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = service.h; sourceTree = "<group>"; };
+		EE65EF901A19E98F008BFAF5 /* idevice.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = idevice.c; sourceTree = "<group>"; };
+		EE65EF911A19E98F008BFAF5 /* idevice.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = idevice.h; sourceTree = "<group>"; };
+		EE65EF931A19EA02008BFAF5 /* libssl.dylib */ = {isa = PBXFileReference; lastKnownFileType = "compiled.mach-o.dylib"; name = libssl.dylib; path = usr/lib/libssl.dylib; sourceTree = SDKROOT; };
+		EE65EFA41A19EADA008BFAF5 /* debug.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = debug.c; sourceTree = "<group>"; };
+		EE65EFA51A19EADA008BFAF5 /* debug.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = debug.h; sourceTree = "<group>"; };
+		EE65EFA61A19EADA008BFAF5 /* socket.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = socket.c; sourceTree = "<group>"; };
+		EE65EFA71A19EADA008BFAF5 /* socket.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = socket.h; sourceTree = "<group>"; };
+		EE65EFA81A19EADA008BFAF5 /* thread.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = thread.c; sourceTree = "<group>"; };
+		EE65EFA91A19EADA008BFAF5 /* thread.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = thread.h; sourceTree = "<group>"; };
+		EE65EFAA1A19EADA008BFAF5 /* userpref.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = userpref.c; sourceTree = "<group>"; };
+		EE65EFAB1A19EADA008BFAF5 /* userpref.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = userpref.h; sourceTree = "<group>"; };
+		EE65EFAC1A19EADA008BFAF5 /* utils.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = utils.c; sourceTree = "<group>"; };
+		EE65EFAD1A19EADA008BFAF5 /* utils.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = utils.h; sourceTree = "<group>"; };
+		EE65EFAE1A19EB5E008BFAF5 /* endianness.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = endianness.h; sourceTree = "<group>"; };
+		EE65EFAF1A19EDC7008BFAF5 /* libssl.0.9.7.dylib */ = {isa = PBXFileReference; lastKnownFileType = "compiled.mach-o.dylib"; name = libssl.0.9.7.dylib; path = usr/lib/libssl.0.9.7.dylib; sourceTree = SDKROOT; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -32,6 +65,9 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				EE65EFB11A19EDE3008BFAF5 /* libssl.dylib in Frameworks */,
+				EE65EF851A19E895008BFAF5 /* libplist.a in Frameworks */,
+				EE65EF801A19E2FF008BFAF5 /* libprotobuf.a in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -41,6 +77,11 @@
 		EE65EF681A19DCCA008BFAF5 = {
 			isa = PBXGroup;
 			children = (
+				EE65EFAF1A19EDC7008BFAF5 /* libssl.0.9.7.dylib */,
+				EE65EF931A19EA02008BFAF5 /* libssl.dylib */,
+				EE65EF841A19E895008BFAF5 /* libplist.a */,
+				EE65EF7F1A19E2FF008BFAF5 /* libprotobuf.a */,
+				EE65EF951A19EADA008BFAF5 /* common */,
 				EE65EF731A19DCCA008BFAF5 /* MobileBackup */,
 				EE65EF721A19DCCA008BFAF5 /* Products */,
 			);
@@ -57,9 +98,38 @@
 		EE65EF731A19DCCA008BFAF5 /* MobileBackup */ = {
 			isa = PBXGroup;
 			children = (
+				EE65EFAE1A19EB5E008BFAF5 /* endianness.h */,
+				EE65EF881A19E92A008BFAF5 /* device_link_service.c */,
+				EE65EF901A19E98F008BFAF5 /* idevice.c */,
+				EE65EF911A19E98F008BFAF5 /* idevice.h */,
+				EE65EF861A19E8EA008BFAF5 /* mobilebackup2.h */,
+				EE65EF8D1A19E977008BFAF5 /* service.c */,
+				EE65EF8E1A19E977008BFAF5 /* service.h */,
+				EE65EF8A1A19E93E008BFAF5 /* property_list_service.c */,
+				EE65EF8B1A19E93E008BFAF5 /* property_list_service.h */,
+				EE65EF871A19E922008BFAF5 /* device_link_service.h */,
+				EE65EF7B1A19DE3A008BFAF5 /* mobilebackup2.c */,
 				EE65EF741A19DCCA008BFAF5 /* main.c */,
 			);
 			path = MobileBackup;
+			sourceTree = "<group>";
+		};
+		EE65EF951A19EADA008BFAF5 /* common */ = {
+			isa = PBXGroup;
+			children = (
+				EE65EFA41A19EADA008BFAF5 /* debug.c */,
+				EE65EFA51A19EADA008BFAF5 /* debug.h */,
+				EE65EFA61A19EADA008BFAF5 /* socket.c */,
+				EE65EFA71A19EADA008BFAF5 /* socket.h */,
+				EE65EFA81A19EADA008BFAF5 /* thread.c */,
+				EE65EFA91A19EADA008BFAF5 /* thread.h */,
+				EE65EFAA1A19EADA008BFAF5 /* userpref.c */,
+				EE65EFAB1A19EADA008BFAF5 /* userpref.h */,
+				EE65EFAC1A19EADA008BFAF5 /* utils.c */,
+				EE65EFAD1A19EADA008BFAF5 /* utils.h */,
+			);
+			name = common;
+			path = MobileBackup/common;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -118,7 +188,12 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				EE65EF8C1A19E93E008BFAF5 /* property_list_service.c in Sources */,
+				EE65EF891A19E92A008BFAF5 /* device_link_service.c in Sources */,
+				EE65EF7C1A19DE3A008BFAF5 /* mobilebackup2.c in Sources */,
+				EE65EF8F1A19E977008BFAF5 /* service.c in Sources */,
 				EE65EF751A19DCCA008BFAF5 /* main.c in Sources */,
+				EE65EF921A19E98F008BFAF5 /* idevice.c in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -128,7 +203,7 @@
 		EE65EF761A19DCCA008BFAF5 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				ALWAYS_SEARCH_USER_PATHS = NO;
+				ALWAYS_SEARCH_USER_PATHS = YES;
 				CLANG_CXX_LANGUAGE_STANDARD = "gnu++0x";
 				CLANG_CXX_LIBRARY = "libc++";
 				CLANG_ENABLE_MODULES = YES;
@@ -168,7 +243,7 @@
 		EE65EF771A19DCCA008BFAF5 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				ALWAYS_SEARCH_USER_PATHS = NO;
+				ALWAYS_SEARCH_USER_PATHS = YES;
 				CLANG_CXX_LANGUAGE_STANDARD = "gnu++0x";
 				CLANG_CXX_LIBRARY = "libc++";
 				CLANG_ENABLE_MODULES = YES;
@@ -202,6 +277,18 @@
 		EE65EF791A19DCCA008BFAF5 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				GCC_PREPROCESSOR_DEFINITIONS = HAVE_OPENSSL;
+				HEADER_SEARCH_PATHS = (
+					"$(inherited)",
+					/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/include,
+					/usr/local/include,
+				);
+				LIBRARY_SEARCH_PATHS = (
+					"$(inherited)",
+					"/Users/igreg/Documents/Sandbox/Home/Frameworks/protobuf-2.5.0/protobuf/lib",
+					/Users/igreg/Documents/Sandbox/libs,
+				);
+				OTHER_LDFLAGS = "-L/usr/local/lib";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 			};
 			name = Debug;
@@ -209,6 +296,18 @@
 		EE65EF7A1A19DCCA008BFAF5 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				GCC_PREPROCESSOR_DEFINITIONS = HAVE_OPENSSL;
+				HEADER_SEARCH_PATHS = (
+					"$(inherited)",
+					/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/include,
+					/usr/local/include,
+				);
+				LIBRARY_SEARCH_PATHS = (
+					"$(inherited)",
+					"/Users/igreg/Documents/Sandbox/Home/Frameworks/protobuf-2.5.0/protobuf/lib",
+					/Users/igreg/Documents/Sandbox/libs,
+				);
+				OTHER_LDFLAGS = "-L/usr/local/lib";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 			};
 			name = Release;
