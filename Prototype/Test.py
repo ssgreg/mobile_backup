@@ -206,7 +206,7 @@ def create_plist(command):
   return pl
 
 
-def create_plist_list_device():
+def create_plist_list_devices():
   return create_plist('ListDevices')
 
 def create_plist_read_buid():
@@ -221,11 +221,17 @@ class TestGetDeviceList(object):
     #
     self.connection = Connection(io_service, connect())
     self.internal_session = UsbMuxPlistSession(self.connection)
-    self.internal_session.send(create_plist_list_device(), self.on_devices)
+    self.internal_session.send(create_plist_list_devices(), self.on_devices)
 
   def on_devices(self, devices):
+    print "device list:"
     for i in devices.DeviceList:
-      print "sn:", i.Properties.SerialNumber, "| did:", i.DeviceID, "| contype:", i.Properties.ConnectionType
+      print "\t", "sn:", i.Properties.SerialNumber, "| did:", i.DeviceID, "| contype:", i.Properties.ConnectionType
+    self.internal_session.send(create_plist_read_buid(), self.on_buid)
+
+  def on_buid(self, buid):
+    print "buid:"
+    print "\t", buid
     self.close()
 
   def close(self):
