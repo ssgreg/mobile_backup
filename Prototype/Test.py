@@ -75,7 +75,7 @@ class Connection(object):
     self.__io.close()
 
   def send(self, data):
-#    print('CON[{}] <-- ({}) {}'.format(id(self.io), len(data), binascii.hexlify(data)))
+    # print('CON[{}] <-- ({}) {}'.format(id(self.__io), len(data), binascii.hexlify(data)))
     self.__io.send(data)
 
   def recv(self, size):
@@ -111,6 +111,23 @@ class UsbMuxHeader(object):
 
 
 #
+# PlistHeader
+#
+
+class PlistHeader(object):
+  SIZE = 4
+
+  def __init__(self, size=None):
+    self.size = size
+
+  def encode(self):
+    return struct.pack('>I', self.size)
+
+  def decode(self, encoded):
+    self.size = struct.unpack_from('>I', encoded)[0]
+
+
+#
 # UsbMuxMessageReceiver
 #
 
@@ -124,6 +141,34 @@ class UsbMuxMessageReceiver(object):
         self.data += connection.recv(UsbMuxHeader.SIZE - len(self.data))
         if len(self.data) == UsbMuxHeader.SIZE:
           self.header = UsbMuxHeader()
+          self.header.decode(self.data)
+          self.data = b''
+    if self.header:
+      if len(self.data) < self.header.size:
+        self.data += connection.recv(self.header.size - len(self.data))
+        if len(self.data) == self.header.size:
+          return True
+    return False
+
+  def reset(self):
+    self.header = None
+    self.data = b''
+
+
+#
+# PlistMessageReceiver
+#
+
+class PlistMessageReceiver(object):
+  def __init__(self):
+    self.reset()
+
+  def recv(self, connection):
+    if not self.header:
+      if len(self.data) < PlistHeader.SIZE:
+        self.data += connection.recv(PlistHeader.SIZE - len(self.data))
+        if len(self.data) == PlistHeader.SIZE:
+          self.header = PlistHeader()
           self.header.decode(self.data)
           self.data = b''
     if self.header:
@@ -165,6 +210,30 @@ class UsbMuxMessageChannel(object):
 
 
 #
+# PlistMessageChannel
+#
+
+class PlistMessageChannel(object):
+  def __init__(self, connection):
+    self.connection = connection
+    self.connection.on_ready_to_recv = self.__on_ready_to_recv
+    self.on_incoming_message = lambda data: None
+    self.__message_receiver = PlistMessageReceiver()
+
+  def send(self, data):
+    header = PlistHeader(len(data))
+    self.connection.send(header.encode())
+    self.connection.send(data)
+
+  def __on_ready_to_recv(self):
+    if self.__message_receiver.recv(self.connection):
+      data = self.__message_receiver.data
+      header = self.__message_receiver.header
+      self.__message_receiver.reset()
+      self.on_incoming_message(data)
+
+
+#
 # UsbMuxPlistChannel
 #
 
@@ -187,6 +256,24 @@ class UsbMuxPlistChannel(object):
 
 
 #
+# PlistChannel
+#
+
+class PlistChannel(object):
+  def __init__(self, connection):
+    self.internal_channel = PlistMessageChannel(connection)
+    self.internal_channel.on_incoming_message = self.__on_incoming_message
+    self.on_incoming_plist = lambda plist_data: None
+
+  def send(self, plist_data):
+    self.internal_channel.send(plist.dumps(plist_data).encode('utf-8'))
+
+  def __on_incoming_message(self, data):
+    plist_data = plist.loads(data.decode('utf-8'))
+    self.on_incoming_plist(plist_data)
+
+
+#
 # UsbMuxPlistSession
 #
 
@@ -195,6 +282,7 @@ class UsbMuxPlistSession(object):
   TAG_FIRST = 0x1000000
 
   def __init__(self, connection):
+    logger().debug('Starting usbmux plist session...')
     self.__channel = UsbMuxPlistChannel(connection)
     self.__channel.on_incoming_plist = self.__on_incoming_plist
     self.on_notification = lambda plist_data: None
@@ -212,7 +300,26 @@ class UsbMuxPlistSession(object):
     else:
       self.callbacks[tag](plist_data)
       del self.callbacks[tag]
-    pass
+
+
+#
+# PlistSession
+#
+
+class PlistSession(object):
+  def __init__(self, connection):
+    logger().debug('Starting plist session...')
+    self.__channel = PlistChannel(connection)
+    self.__channel.on_incoming_plist = self.__on_incoming_plist
+    self.callback = None
+
+  def send(self, plist_data, on_result):
+    self.callback = on_result
+    self.__channel.send(plist_data)
+
+  def __on_incoming_plist(self, plist_data):
+      self.callback(plist_data)
+      self.callback = None
 
 
 
@@ -228,7 +335,7 @@ def connect():
   return sock
 
 
-def create_plist(command):
+def create_usbmux_plist(command):
   pl = dict(
     BundleID = 'org.acronis.usbmuxd',
     ClientVersionString = '1.0.0',
@@ -237,21 +344,27 @@ def create_plist(command):
     kLibUSBMuxVersion = 1)
   return pl
 
-def create_plist_list_devices():
-  return create_plist('ListDevices')
+def create_usbmux_plist_list_devices():
+  return create_usbmux_plist('ListDevices')
 
-def create_plist_read_buid():
-  return create_plist('ReadBUID')
+def create_usbmux_plist_read_buid():
+  return create_usbmux_plist('ReadBUID')
 
-def create_plist_listen():
-  return create_plist('Listen')
+def create_usbmux_plist_listen():
+  return create_usbmux_plist('Listen')
 
-def create_plist_connect(did, port):
-  plist_data = create_plist('Connect')
+def create_usbmux_plist_connect(did, port):
+  plist_data = create_usbmux_plist('Connect')
   plist_data['DeviceID'] = did
   plist_data['PortNumber'] = port
   return plist_data
 
+
+def create_plist_query_type(client):
+  return dict(
+    Label = client,
+    Request = 'QueryType'
+    )
 
 def print_device_info(device):
   print '\t', 'did:', device.DeviceID, '| sn:', device.Properties.SerialNumber, '| contype:', device.Properties.ConnectionType, '| pid: {0}'.format(device.Properties.ProductID) if 'ProductID' in device.Properties else ''
@@ -266,7 +379,7 @@ class TestGetDeviceList(object):
     self.connection = Connection(io_service, connect())
     self.internal_session = UsbMuxPlistSession(self.connection)
     logger().debug('Getting device list...')
-    self.internal_session.send(create_plist_list_devices(), self.on_devices)
+    self.internal_session.send(create_usbmux_plist_list_devices(), self.on_devices)
 
   def on_devices(self, devices):
     print 'device list:'
@@ -274,7 +387,7 @@ class TestGetDeviceList(object):
       print_device_info(i)
     #
     logger().debug('Getting buid...')
-    self.internal_session.send(create_plist_read_buid(), self.on_buid)
+    self.internal_session.send(create_usbmux_plist_read_buid(), self.on_buid)
 
   def on_buid(self, buid):
     print 'buid:'
@@ -297,7 +410,7 @@ class TestListenForDevices(object):
     self.internal_session.on_notification = self.on_notification
     #
     logger().debug('Listening for devices...')
-    self.internal_session.send(create_plist_listen(), self.on_listen)
+    self.internal_session.send(create_usbmux_plist_listen(), self.on_listen)
 
   def on_listen(self, confirmation):
     logger().debug('Listen confirmed')
@@ -325,14 +438,20 @@ class TestConnectToLockdown(object):
     self.internal_session = UsbMuxPlistSession(self.connection)
     #
     logger().debug('Connecting to lockdown...')
-    self.internal_session.send(create_plist_connect(did, 62078), self.on_connect_to_lockdown)
+    self.internal_session.send(create_usbmux_plist_connect(did, 32498), self.on_connect_to_lockdown)
 
   def on_connect_to_lockdown(self, confirmation):
-    if confirmation.Number != 3:
-      print "Failed to connect to the lockdown service of the device with did:", self.did
+    if confirmation.Number != 0:
+      print "Failed to connect to the lockdown service of the device with a did:", self.did
       self.close()
     else:
-      self.close()
+      self.internal_session = PlistSession(self.connection)
+      logger().debug('Quering lockdown type...')
+      self.internal_session.send(create_plist_query_type('idevicebackup2'), self.on_query_type)
+
+
+  def on_query_type(self, result):
+    self.close()
 
   def close(self):
     self.connection.close()
@@ -346,7 +465,7 @@ def Main():
   io_service = IOService()
 #  TestGetDeviceList(io_service)
 #  TestListenForDevices(io_service)
-  TestConnectToLockdown(io_service, 389)
+  TestConnectToLockdown(io_service, 373)
   io_service.run()
 
 
@@ -354,6 +473,7 @@ Main()
 
 
 # Devices that accessed only by network are not enumerates via listen session.
+# It's impossible to send another request before we get response from the prev request (both for usbmux and plist). Like zmq request/reply socket.
 
 # {'DeviceList':
 #   [
@@ -397,3 +517,4 @@ Main()
 # {'Number': 3, 'MessageType': 'Result'}
 # to incorrect device id:
 # {'Number': 2, 'MessageType': 'Result'}
+
