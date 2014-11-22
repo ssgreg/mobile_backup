@@ -9,6 +9,10 @@ import collections
 import sys
 
 
+#
+# IOService
+#
+
 class IOService(object):
   def __init__(self):
     XHolder = collections.namedtuple('XHolder', 'ios, x')
@@ -46,6 +50,9 @@ class IOService(object):
         xh.x[io]()
 
 
+#
+# Connection
+#
 
 class Connection(object):
   def __init__(self, service, io):
@@ -94,6 +101,10 @@ class UsbMuxHeader(object):
     self.size -= self.SIZE
 
 
+#
+# UsbMuxMessageReceiver
+#
+
 class UsbMuxMessageReceiver(object):
   def __init__(self):
     self.reset()
@@ -118,6 +129,10 @@ class UsbMuxMessageReceiver(object):
     self.data = b''
 
 
+#
+# UsbMuxMessageChannel
+#
+
 class UsbMuxMessageChannel(object):
   USBMUX_VERSION = 1
 
@@ -140,6 +155,10 @@ class UsbMuxMessageChannel(object):
       self.on_incoming_message(data, header.tag, header.mtype)
 
 
+#
+# UsbMuxPlistChannel
+#
+
 class UsbMuxPlistChannel(object):
   PLIST_MTYPE = 8
 
@@ -157,6 +176,10 @@ class UsbMuxPlistChannel(object):
     plist_data = plist.loads(data.decode('utf-8'))
     self.on_incoming_plist(plist_data, tag)
 
+
+#
+# UsbMuxPlistSession
+#
 
 class UsbMuxPlistSession(object):
   TAG_NOTIFICATION = 0
