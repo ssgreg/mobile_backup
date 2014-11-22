@@ -185,9 +185,9 @@ class UsbMuxPlistSession(object):
 
 
 def connect():
-  print "Current platform:", sys.platform
+  print 'Current platform:', sys.platform
   if (sys.platform == 'darwin'):
-    print "Using unix socket to connect to the usbmuxd..."
+    print 'Using unix socket to connect to the usbmuxd...'
     sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
     sock.connect(r'/var/run/usbmuxd')
   else:
@@ -221,19 +221,19 @@ class TestGetDeviceList(object):
     #
     self.connection = Connection(io_service, connect())
     self.internal_session = UsbMuxPlistSession(self.connection)
-    print "Getting device list..."
+    print 'Getting device list...'
     self.internal_session.send(create_plist_list_devices(), self.on_devices)
 
   def on_devices(self, devices):
-    print "device list:"
+    print 'device list:'
     for i in devices.DeviceList:
-      print "\t", "sn:", i.Properties.SerialNumber, "| did:", i.DeviceID, "| contype:", i.Properties.ConnectionType
-    print "Getting buid..."
+      print '\t', 'sn:', i.Properties.SerialNumber, '| did:', i.DeviceID, '| contype:', i.Properties.ConnectionType, '| pid: {0}'.format(i.Properties.ProductID) if 'ProductID' in i.Properties else ''
+    print 'Getting buid...'
     self.internal_session.send(create_plist_read_buid(), self.on_buid)
 
   def on_buid(self, buid):
-    print "buid:"
-    print "\t", buid
+    print 'buid:'
+    print '\t', buid
     self.close()
 
   def close(self):
