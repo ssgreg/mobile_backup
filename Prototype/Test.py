@@ -208,7 +208,6 @@ class UsbMuxPlistSession(object):
 
 
 def connect():
-  print 'Current platform:', sys.platform
   if (sys.platform == 'darwin'):
     print 'Using unix socket to connect to the usbmuxd...'
     sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
@@ -234,6 +233,13 @@ def create_plist_list_devices():
 def create_plist_read_buid():
   return create_plist('ReadBUID')
 
+def create_plist_listen():
+  return create_plist('Listen')
+
+
+def print_device_info(device):
+  print '\t', 'did:', device.DeviceID, '| sn:', device.Properties.SerialNumber, '| contype:', device.Properties.ConnectionType, '| pid: {0}'.format(device.Properties.ProductID) if 'ProductID' in device.Properties else ''
+
 
 #
 # TestGetDeviceList
@@ -241,7 +247,6 @@ def create_plist_read_buid():
 
 class TestGetDeviceList(object):
   def __init__(self, io_service):
-    #
     self.connection = Connection(io_service, connect())
     self.internal_session = UsbMuxPlistSession(self.connection)
     print 'Getting device list...'
@@ -250,7 +255,7 @@ class TestGetDeviceList(object):
   def on_devices(self, devices):
     print 'device list:'
     for i in devices.DeviceList:
-      print '\t', 'sn:', i.Properties.SerialNumber, '| did:', i.DeviceID, '| contype:', i.Properties.ConnectionType, '| pid: {0}'.format(i.Properties.ProductID) if 'ProductID' in i.Properties else ''
+      print_device_info(i)
     print 'Getting buid...'
     self.internal_session.send(create_plist_read_buid(), self.on_buid)
 
@@ -263,9 +268,39 @@ class TestGetDeviceList(object):
     self.connection.close()
 
 
+#
+# TestListenForDevices
+#
+
+class TestListenForDevices(object):
+  def __init__(self, io_service):
+    io_service.scheduler.enter(10, 1, self.close, ())
+    self.connection = Connection(io_service, connect())
+    self.internal_session = UsbMuxPlistSession(self.connection)
+    self.internal_session.on_notification = self.on_notification
+    print 'Listening for devices...'
+    self.internal_session.send(create_plist_listen(), self.on_listen)
+
+  def on_listen(self, confirmation):
+    print 'Started to listen'
+
+  def on_notification(self, notification):
+    if notification.MessageType == 'Attached':
+      print 'Device attached:'
+      print_device_info(notification)
+    else:
+      print 'Device dettached:'
+      print '\t', 'did:', notification.DeviceID
+
+  def close(self):
+    self.connection.close()
+
+
+print 'Current platform:', sys.platform
 
 io_service = IOService()
-TestGetDeviceList(io_service)
+#TestGetDeviceList(io_service)
+TestListenForDevices(io_service)
 io_service.run()
 
 
@@ -305,3 +340,6 @@ io_service.run()
 #   ]
 # }
 
+#
+# {'DeviceID': 369, 'MessageType': 'Detached'}
+#
