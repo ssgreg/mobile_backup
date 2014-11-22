@@ -7,6 +7,15 @@ import select
 import time
 import collections
 import sys
+import logging
+import logging.config
+
+
+def configure_logger():
+  logging.config.fileConfig('logging.ini')
+
+def logger():
+  return logging.getLogger(__name__)
 
 
 #
@@ -209,10 +218,11 @@ class UsbMuxPlistSession(object):
 
 def connect():
   if (sys.platform == 'darwin'):
-    print 'Using unix socket to connect to the usbmuxd...'
+    logger().info('Using UNIX socket to connect to the usbmuxd...')
     sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
     sock.connect(r'/var/run/usbmuxd')
   else:
+    logger().info('Connection to the apple service...')
     sock = socket.socket()
     sock.connect('127.0.0.1', 27015)
   return sock
@@ -249,14 +259,15 @@ class TestGetDeviceList(object):
   def __init__(self, io_service):
     self.connection = Connection(io_service, connect())
     self.internal_session = UsbMuxPlistSession(self.connection)
-    print 'Getting device list...'
+    logger().debug('Getting device list...')
     self.internal_session.send(create_plist_list_devices(), self.on_devices)
 
   def on_devices(self, devices):
     print 'device list:'
     for i in devices.DeviceList:
       print_device_info(i)
-    print 'Getting buid...'
+    #
+    logger().debug('Getting buid...')
     self.internal_session.send(create_plist_read_buid(), self.on_buid)
 
   def on_buid(self, buid):
@@ -278,11 +289,12 @@ class TestListenForDevices(object):
     self.connection = Connection(io_service, connect())
     self.internal_session = UsbMuxPlistSession(self.connection)
     self.internal_session.on_notification = self.on_notification
-    print 'Listening for devices...'
+    #
+    logger().debug('Listening for devices...')
     self.internal_session.send(create_plist_listen(), self.on_listen)
 
   def on_listen(self, confirmation):
-    print 'Started to listen'
+    logger().debug('Started to listen')
 
   def on_notification(self, notification):
     if notification.MessageType == 'Attached':
@@ -296,14 +308,18 @@ class TestListenForDevices(object):
     self.connection.close()
 
 
-print 'Current platform:', sys.platform
 
-io_service = IOService()
-#TestGetDeviceList(io_service)
-TestListenForDevices(io_service)
-io_service.run()
+def Main():
+  configure_logger()
+  logger().info('Current platform: {0}'.format(sys.platform))
+
+  io_service = IOService()
+  TestGetDeviceList(io_service)
+  TestListenForDevices(io_service)
+  io_service.run()
 
 
+Main()
 
 # io_service.scheduler.enter(0, 1, lambda io_service: TestGetDeviceList(io_service) , (io_service, ) )
 # io_service.scheduler.enter(0, 1, lambda io_service: TestGetDeviceList(io_service) , (io_service, ) )
