@@ -190,15 +190,6 @@ class UsbMuxPlistSession(object):
 
 
 
-class UsbMuxdListSession(object):
-  def __init__(self, connection):
-    self.internal_session = UsbMuxPlistSession(connection)
-
-  def devices(self, on_result):
-    self.internal_session.send(create_plist_list_device(), on_result)
-
-
-
 def connect():
   sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
   sock.connect(r'/var/run/usbmuxd')
@@ -218,6 +209,9 @@ def create_plist(command):
 def create_plist_list_device():
   return create_plist('ListDevices')
 
+def create_plist_read_build():
+  return create_plist('ReadBUID')
+
 #
 # TestGetDeviceList
 #
@@ -226,8 +220,8 @@ class TestGetDeviceList(object):
   def __init__(self, io_service):
     #
     self.connection = Connection(io_service, connect())
-    self.list_session = UsbMuxdListSession(self.connection)
-    self.list_session.devices(self.on_devices)
+    self.internal_session = UsbMuxPlistSession(self.connection)
+    self.internal_session.send(create_plist_list_device(), self.on_devices)
 
   def on_devices(self, devices):
     for i in devices.DeviceList:
