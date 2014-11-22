@@ -6,6 +6,7 @@ import sched
 import select
 import time
 import collections
+import sys
 
 
 class IOService(object):
@@ -72,16 +73,9 @@ class Connection(object):
     self.on_ready_to_recv()
 
 
-
-#class UsbMuxdPlistMessageChannel
-
-
-
-class UsbMuxdListenSession(object):
-  def __init__(self, connection):
-    self.connection = connection
-    self.tag = 0
-
+#
+# UsbMuxHeader
+#
 
 class UsbMuxHeader(object):
   SIZE = 16
@@ -191,8 +185,14 @@ class UsbMuxPlistSession(object):
 
 
 def connect():
-  sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-  sock.connect(r'/var/run/usbmuxd')
+  print "Current platform:", sys.platform
+  if (sys.platform == 'darwin'):
+    print "Using unix socket to connect to the usbmuxd..."
+    sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+    sock.connect(r'/var/run/usbmuxd')
+  else:
+    sock = socket.socket()
+    sock.connect('127.0.0.1', 27015)
   return sock
 
 
@@ -205,12 +205,12 @@ def create_plist(command):
     kLibUSBMuxVersion = 1)
   return pl
 
-
 def create_plist_list_devices():
   return create_plist('ListDevices')
 
 def create_plist_read_buid():
   return create_plist('ReadBUID')
+
 
 #
 # TestGetDeviceList
@@ -221,12 +221,14 @@ class TestGetDeviceList(object):
     #
     self.connection = Connection(io_service, connect())
     self.internal_session = UsbMuxPlistSession(self.connection)
+    print "Getting device list..."
     self.internal_session.send(create_plist_list_devices(), self.on_devices)
 
   def on_devices(self, devices):
     print "device list:"
     for i in devices.DeviceList:
       print "\t", "sn:", i.Properties.SerialNumber, "| did:", i.DeviceID, "| contype:", i.Properties.ConnectionType
+    print "Getting buid..."
     self.internal_session.send(create_plist_read_buid(), self.on_buid)
 
   def on_buid(self, buid):
