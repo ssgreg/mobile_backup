@@ -62,9 +62,6 @@ class Connection(object):
     self.__io.send(data)
 
   def recv(self, size):
-    # data = b''
-    # while len(data) < size:
-    #   data += self.__io.recv(size - len(data))
 #    print('CON[{}] --> ({}) {}'.format(id(self.io), len(data), binascii.hexlify(data)))
     data = self.__io.recv(size)
     if not data:
