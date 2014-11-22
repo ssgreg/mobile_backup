@@ -209,7 +209,7 @@ def create_plist(command):
 def create_plist_list_device():
   return create_plist('ListDevices')
 
-def create_plist_read_build():
+def create_plist_read_buid():
   return create_plist('ReadBUID')
 
 #
