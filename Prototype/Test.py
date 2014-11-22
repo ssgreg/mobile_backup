@@ -246,6 +246,12 @@ def create_plist_read_buid():
 def create_plist_listen():
   return create_plist('Listen')
 
+def create_plist_connect(did, port):
+  plist_data = create_plist('Connect')
+  plist_data['DeviceID'] = did
+  plist_data['PortNumber'] = port
+  return plist_data
+
 
 def print_device_info(device):
   print '\t', 'did:', device.DeviceID, '| sn:', device.Properties.SerialNumber, '| contype:', device.Properties.ConnectionType, '| pid: {0}'.format(device.Properties.ProductID) if 'ProductID' in device.Properties else ''
@@ -294,7 +300,7 @@ class TestListenForDevices(object):
     self.internal_session.send(create_plist_listen(), self.on_listen)
 
   def on_listen(self, confirmation):
-    logger().debug('Started to listen')
+    logger().debug('Listen confirmed')
 
   def on_notification(self, notification):
     if notification.MessageType == 'Attached':
@@ -308,21 +314,46 @@ class TestListenForDevices(object):
     self.connection.close()
 
 
+#
+# TestConnectToLockdown
+#
+
+class TestConnectToLockdown(object):
+  def __init__(self, io_service, did):
+    self.did = did
+    self.connection = Connection(io_service, connect())
+    self.internal_session = UsbMuxPlistSession(self.connection)
+    #
+    logger().debug('Connecting to lockdown...')
+    self.internal_session.send(create_plist_connect(did, 62078), self.on_connect_to_lockdown)
+
+  def on_connect_to_lockdown(self, confirmation):
+    if confirmation.Number != 3:
+      print "Failed to connect to the lockdown service of the device with did:", self.did
+      self.close()
+    else:
+      self.close()
+
+  def close(self):
+    self.connection.close()
+
 
 def Main():
+  print "Acronis Mobile Backup for Apple devices."
   configure_logger()
   logger().info('Current platform: {0}'.format(sys.platform))
 
   io_service = IOService()
-  TestGetDeviceList(io_service)
-  TestListenForDevices(io_service)
+#  TestGetDeviceList(io_service)
+#  TestListenForDevices(io_service)
+  TestConnectToLockdown(io_service, 389)
   io_service.run()
 
 
 Main()
 
-# io_service.scheduler.enter(0, 1, lambda io_service: TestGetDeviceList(io_service) , (io_service, ) )
-# io_service.scheduler.enter(0, 1, lambda io_service: TestGetDeviceList(io_service) , (io_service, ) )
+
+# Devices that accessed only by network are not enumerates via listen session.
 
 # {'DeviceList':
 #   [
@@ -357,5 +388,12 @@ Main()
 # }
 
 #
+# listen notification: (device detached)
 # {'DeviceID': 369, 'MessageType': 'Detached'}
 #
+
+# connect to lockdown:
+# to correct device id:
+# {'Number': 3, 'MessageType': 'Result'}
+# to incorrect device id:
+# {'Number': 2, 'MessageType': 'Result'}
