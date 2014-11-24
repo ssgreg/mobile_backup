@@ -110,6 +110,10 @@ class UsbMuxHeader(object):
     self.size -= self.SIZE
 
 
+def makeUsbMuxHeader(size=None, version=None, mtype=None, tag=None):
+  return UsbMuxHeader(size, version, mtype, tag)
+
+
 #
 # PlistHeader
 #
@@ -127,48 +131,26 @@ class PlistHeader(object):
     self.size = struct.unpack_from('>I', encoded)[0]
 
 
+def makePlistHeader(size=None):
+  return PlistHeader(size)
+
+
 #
-# UsbMuxMessageReceiver
+# MessageReceiver
 #
 
-class UsbMuxMessageReceiver(object):
-  def __init__(self):
+class MessageReceiver(object):
+  def __init__(self, header_factory=None, header_size=None):
+    self.__header_factory = header_factory
+    self.__header_size = header_size
     self.reset()
 
   def recv(self, connection):
     if not self.header:
-      if len(self.data) < UsbMuxHeader.SIZE:
-        self.data += connection.recv(UsbMuxHeader.SIZE - len(self.data))
-        if len(self.data) == UsbMuxHeader.SIZE:
-          self.header = UsbMuxHeader()
-          self.header.decode(self.data)
-          self.data = b''
-    if self.header:
-      if len(self.data) < self.header.size:
-        self.data += connection.recv(self.header.size - len(self.data))
-        if len(self.data) == self.header.size:
-          return True
-    return False
-
-  def reset(self):
-    self.header = None
-    self.data = b''
-
-
-#
-# PlistMessageReceiver
-#
-
-class PlistMessageReceiver(object):
-  def __init__(self):
-    self.reset()
-
-  def recv(self, connection):
-    if not self.header:
-      if len(self.data) < PlistHeader.SIZE:
-        self.data += connection.recv(PlistHeader.SIZE - len(self.data))
-        if len(self.data) == PlistHeader.SIZE:
-          self.header = PlistHeader()
+      if len(self.data) < self.__header_size:
+        self.data += connection.recv(self.__header_size - len(self.data))
+        if len(self.data) == self.__header_size:
+          self.header = self.__header_factory()
           self.header.decode(self.data)
           self.data = b''
     if self.header:
@@ -194,7 +176,7 @@ class UsbMuxMessageChannel(object):
     self.connection = connection
     self.connection.on_ready_to_recv = self.__on_ready_to_recv
     self.on_incoming_message = lambda data, tag, mtype: None
-    self.__message_receiver = UsbMuxMessageReceiver()
+    self.__message_receiver = MessageReceiver(makeUsbMuxHeader, UsbMuxHeader.SIZE)
 
   def send(self, data, tag, mtype):
     header = UsbMuxHeader(len(data), self.USBMUX_VERSION, mtype, tag)
@@ -218,7 +200,7 @@ class PlistMessageChannel(object):
     self.connection = connection
     self.connection.on_ready_to_recv = self.__on_ready_to_recv
     self.on_incoming_message = lambda data: None
-    self.__message_receiver = PlistMessageReceiver()
+    self.__message_receiver = MessageReceiver(makePlistHeader, PlistHeader.SIZE)
 
   def send(self, data):
     header = PlistHeader(len(data))
@@ -318,8 +300,8 @@ class PlistSession(object):
     self.__channel.send(plist_data)
 
   def __on_incoming_plist(self, plist_data):
-      self.callback(plist_data)
-      self.callback = None
+    self.callback(plist_data)
+    self.callback = None
 
 
 
@@ -359,15 +341,20 @@ def create_usbmux_plist_connect(did, port):
   plist_data['PortNumber'] = port
   return plist_data
 
+def create_usbmux_read_pair_record(sn):
+  plist_data = create_usbmux_plist('ReadPairRecord')
+  plist_data['PairRecordID'] = sn
+  return plist_data
 
-def create_plist_query_type(client):
-  return dict(
-    Label = client,
-    Request = 'QueryType'
-    )
+def create_plist_query_type():
+  return dict(Request = 'QueryType')
+
 
 def print_device_info(device):
   print '\t', 'did:', device.DeviceID, '| sn:', device.Properties.SerialNumber, '| contype:', device.Properties.ConnectionType, '| pid: {0}'.format(device.Properties.ProductID) if 'ProductID' in device.Properties else ''
+
+
+SERVICE_TYPE_LOCKDOWN = 'com.apple.mobile.lockdown'
 
 
 #
@@ -432,26 +419,37 @@ class TestListenForDevices(object):
 #
 
 class TestConnectToLockdown(object):
-  def __init__(self, io_service, did):
+  def __init__(self, io_service, did, sn):
     self.did = did
+    self.sn = sn
     self.connection = Connection(io_service, connect())
     self.internal_session = UsbMuxPlistSession(self.connection)
     #
-    logger().debug('Connecting to lockdown...')
-    self.internal_session.send(create_usbmux_plist_connect(did, 32498), self.on_connect_to_lockdown)
+    logger().debug('Reading pair record...')
+    self.internal_session.send(create_usbmux_read_pair_record(self.sn), self.on_get_pair_record)
 
   def on_connect_to_lockdown(self, confirmation):
     if confirmation.Number != 0:
-      print "Failed to connect to the lockdown service of the device with a did:", self.did
+      print 'Failed to connect to the lockdown service of the device with a did:', self.did
       self.close()
     else:
       self.internal_session = PlistSession(self.connection)
-      logger().debug('Quering lockdown type...')
-      self.internal_session.send(create_plist_query_type('idevicebackup2'), self.on_query_type)
-
+      logger().debug('Quering service type...')
+      self.internal_session.send(create_plist_query_type(), self.on_query_type)
+      # 'idevicebackup2'
 
   def on_query_type(self, result):
-    self.close()
+    if result.Type != SERVICE_TYPE_LOCKDOWN:
+      print 'Failed to query the lockdown service type.'
+      self.close()
+    else:
+      pass
+      # self.internal_session = UsbMuxPlistSession(self.connection)
+      # self.internal_session.send(create_plist_get_pair_record(self.sn), self.on_get_pair_record)
+
+  def on_get_pair_record(self, result):
+    logger().debug('Connecting to lockdown...')
+    self.internal_session.send(create_usbmux_plist_connect(self.did, 32498), self.on_connect_to_lockdown)
 
   def close(self):
     self.connection.close()
@@ -465,7 +463,7 @@ def Main():
   io_service = IOService()
 #  TestGetDeviceList(io_service)
 #  TestListenForDevices(io_service)
-  TestConnectToLockdown(io_service, 373)
+  TestConnectToLockdown(io_service, 776, 'fe4121986da469cbd4ff59fce5cb8383aee5e120')
   io_service.run()
 
 
@@ -473,7 +471,7 @@ Main()
 
 
 # Devices that accessed only by network are not enumerates via listen session.
-# It's impossible to send another request before we get response from the prev request (both for usbmux and plist). Like zmq request/reply socket.
+
 
 # {'DeviceList':
 #   [
@@ -514,7 +512,9 @@ Main()
 
 # connect to lockdown:
 # to correct device id:
-# {'Number': 3, 'MessageType': 'Result'}
+# {'Number': 0, 'MessageType': 'Result'}
 # to incorrect device id:
 # {'Number': 2, 'MessageType': 'Result'}
 
+# query service type:
+# {'Type': 'com.apple.mobile.lockdown', 'Request': 'QueryType'}
