@@ -256,15 +256,15 @@ class PlistChannel(object):
 
 
 #
-# UsbMuxPlistSession
+# UsbMuxSession
 #
 
-class UsbMuxPlistSession(object):
+class UsbMuxSession(object):
   TAG_NOTIFICATION = 0
   TAG_FIRST = 0x1000000
 
   def __init__(self, connection):
-    logger().debug('Starting usbmux plist session...')
+    logger().debug('Starting usbmux session...')
     self.__channel = UsbMuxPlistChannel(connection)
     self.__channel.on_incoming_plist = self.__on_incoming_plist
     self.on_notification = lambda plist_data: None
@@ -285,24 +285,36 @@ class UsbMuxPlistSession(object):
 
 
 #
-# PlistSession
+# LockdownSession
 #
 
-class PlistSession(object):
+class LockdownSession(object):
+  FIELD_REQUEST = 'Request'
+
   def __init__(self, connection):
-    logger().debug('Starting plist session...')
+    logger().debug('Starting lockdown session...')
     self.__channel = PlistChannel(connection)
     self.__channel.on_incoming_plist = self.__on_incoming_plist
-    self.callback = None
+    self.reset()
 
   def send(self, plist_data, on_result):
+    if self.FIELD_REQUEST not in plist_data:
+      raise RuntimeError('Passed plist does not contain obligatory fields.')
     self.callback = on_result
+    self.original_request = plist_data[self.FIELD_REQUEST]
     self.__channel.send(plist_data)
 
   def __on_incoming_plist(self, plist_data):
-    self.callback(plist_data)
-    self.callback = None
+    if self.FIELD_REQUEST not in plist_data or plist_data[self.FIELD_REQUEST] != self.original_request:
+      raise RuntimeError('Lockdown recieved incorrect data.')
+    # store callback locally to avoid problems with calling 'send' in callback
+    callback = self.callback
+    self.reset()
+    callback(plist_data)
 
+  def reset(self):
+    self.callback = None
+    self.original_request = ''
 
 
 def connect():
@@ -349,6 +361,12 @@ def create_usbmux_read_pair_record(sn):
 def create_plist_query_type():
   return dict(Request = 'QueryType')
 
+def create_plist_validate_pair(host_id):
+  return dict(
+    PairRecord = dict(HostID = host_id),
+    Request = 'ValidatePair',
+    ProtocolVersion = '2')
+
 
 def print_device_info(device):
   print '\t', 'did:', device.DeviceID, '| sn:', device.Properties.SerialNumber, '| contype:', device.Properties.ConnectionType, '| pid: {0}'.format(device.Properties.ProductID) if 'ProductID' in device.Properties else ''
@@ -364,7 +382,7 @@ SERVICE_TYPE_LOCKDOWN = 'com.apple.mobile.lockdown'
 class TestGetDeviceList(object):
   def __init__(self, io_service):
     self.connection = Connection(io_service, connect())
-    self.internal_session = UsbMuxPlistSession(self.connection)
+    self.internal_session = UsbMuxSession(self.connection)
     logger().debug('Getting device list...')
     self.internal_session.send(create_usbmux_plist_list_devices(), self.on_devices)
 
@@ -393,7 +411,7 @@ class TestListenForDevices(object):
   def __init__(self, io_service):
     io_service.scheduler.enter(10, 1, self.close, ())
     self.connection = Connection(io_service, connect())
-    self.internal_session = UsbMuxPlistSession(self.connection)
+    self.internal_session = UsbMuxSession(self.connection)
     self.internal_session.on_notification = self.on_notification
     #
     logger().debug('Listening for devices...')
@@ -424,34 +442,47 @@ class TestConnectToLockdown(object):
     self.sn = sn
     self.pair_record_data = None
     self.connection = Connection(io_service, connect())
-    self.internal_session = UsbMuxPlistSession(self.connection)
+    self.internal_session = UsbMuxSession(self.connection)
     #
-    logger().debug('Reading pair record...')
-    self.internal_session.send(create_usbmux_read_pair_record(self.sn), self.on_get_pair_record)
+    self.read_pair_record()
+
+  def on_get_pair_record(self, result):
+    self.pair_record_data = plist.loads(result.PairRecordData.data.decode('utf-8'))
+    self.connect_to_lockdown()
 
   def on_connect_to_lockdown(self, confirmation):
     if confirmation.Number != 0:
       print 'Failed to connect to the lockdown service of the device with a did:', self.did
       self.close()
-    else:
-      self.internal_session = PlistSession(self.connection)
-      logger().debug('Quering service type...')
-      self.internal_session.send(create_plist_query_type(), self.on_query_type)
-      # 'idevicebackup2'
+    self.internal_session = LockdownSession(self.connection)
+    self.check_lockdown_type()
 
-  def on_query_type(self, result):
+  def on_check_lockdown_type(self, result):
     if result.Type != SERVICE_TYPE_LOCKDOWN:
       print 'Failed to query the lockdown service type.'
       self.close()
-    else:
-      pass
-      # self.internal_session = UsbMuxPlistSession(self.connection)
-      # self.internal_session.send(create_plist_get_pair_record(self.sn), self.on_get_pair_record)
+    self.validate_pair_record()
 
-  def on_get_pair_record(self, result):
-    self.pair_record_data = plist.loads(result.PairRecordData.data.decode('utf-8'))
+  def on_validate_pair_record(self, result):
+    if 'Error' in result:
+      print 'Failed to validate pair. Error:', result['Error']
+    self.close()
+
+  def read_pair_record(self):
+    logger().debug('Reading pair record...')
+    self.internal_session.send(create_usbmux_read_pair_record(self.sn), self.on_get_pair_record)
+
+  def connect_to_lockdown(self):
     logger().debug('Connecting to lockdown...')
     self.internal_session.send(create_usbmux_plist_connect(self.did, 32498), self.on_connect_to_lockdown)
+
+  def check_lockdown_type(self):
+    logger().debug('Quering service type...')
+    self.internal_session.send(create_plist_query_type(), self.on_check_lockdown_type)
+
+  def validate_pair_record(self):
+    logger().debug('Validating pair record...')
+    self.internal_session.send(create_plist_validate_pair(self.pair_record_data['HostID']), self.on_validate_pair_record)
 
   def close(self):
     self.connection.close()
@@ -630,4 +661,10 @@ Main()
 #     -----END CERTIFICATE-----'),
 # 'WiFiMACAddress': '6c:40:08:df:de:d1'
 #   }
-  
+
+# validate pair
+# success:
+# {'Request': 'ValidatePair'}
+# unsuccess: (invalid host id)
+# {'Request': 'ValidatePair', 'Error': 'InvalidHostID'}
+
