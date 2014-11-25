@@ -9,6 +9,7 @@ import collections
 import sys
 import logging
 import logging.config
+import wl
 
 
 def configure_logger():
@@ -264,12 +265,12 @@ class UsbMuxSession(object):
   TAG_FIRST = 0x1000000
 
   def __init__(self, connection):
-    logger().debug('Starting usbmux session...')
     self.__channel = UsbMuxPlistChannel(connection)
     self.__channel.on_incoming_plist = self.__on_incoming_plist
     self.on_notification = lambda plist_data: None
     self.callbacks = {}
     self.tag = self.TAG_FIRST
+    logger().debug('UsbMux session has started.')
 
   def send(self, plist_data, on_result):
     self.callbacks[self.tag] = on_result
@@ -292,10 +293,10 @@ class LockdownSession(object):
   FIELD_REQUEST = 'Request'
 
   def __init__(self, connection):
-    logger().debug('Starting lockdown session...')
     self.__channel = PlistChannel(connection)
     self.__channel.on_incoming_plist = self.__on_incoming_plist
     self.reset()
+    logger().debug('Lockdown session has started.')
 
   def send(self, plist_data, on_result):
     if self.FIELD_REQUEST not in plist_data:
@@ -319,17 +320,17 @@ class LockdownSession(object):
 
 def connect():
   if (sys.platform == 'darwin'):
-    logger().info('Using UNIX socket to connect to the usbmuxd...')
+    logger().info('Using UNIX socket to connect to the usbmuxd.')
     sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
     sock.connect(r'/var/run/usbmuxd')
   else:
-    logger().info('Connection to the apple service...')
+    logger().info('Connecting to the apple service...')
     sock = socket.socket()
     sock.connect('127.0.0.1', 27015)
   return sock
 
 
-def create_usbmux_plist(command):
+def create_usbmux_message(command):
   pl = dict(
     BundleID = 'org.acronis.usbmuxd',
     ClientVersionString = '1.0.0',
@@ -338,30 +339,30 @@ def create_usbmux_plist(command):
     kLibUSBMuxVersion = 1)
   return pl
 
-def create_usbmux_plist_list_devices():
-  return create_usbmux_plist('ListDevices')
+def create_usbmux_message_list_devices():
+  return create_usbmux_message('ListDevices')
 
-def create_usbmux_plist_read_buid():
-  return create_usbmux_plist('ReadBUID')
+def create_usbmux_message_read_buid():
+  return create_usbmux_message('ReadBUID')
 
-def create_usbmux_plist_listen():
-  return create_usbmux_plist('Listen')
+def create_usbmux_message_listen():
+  return create_usbmux_message('Listen')
 
-def create_usbmux_plist_connect(did, port):
-  plist_data = create_usbmux_plist('Connect')
+def create_usbmux_message_connect(did, port):
+  plist_data = create_usbmux_message('Connect')
   plist_data['DeviceID'] = did
   plist_data['PortNumber'] = port
   return plist_data
 
-def create_usbmux_read_pair_record(sn):
-  plist_data = create_usbmux_plist('ReadPairRecord')
+def create_usbmux_message_read_pair_record(sn):
+  plist_data = create_usbmux_message('ReadPairRecord')
   plist_data['PairRecordID'] = sn
   return plist_data
 
-def create_plist_query_type():
+def create_lockdown_message_query_type():
   return dict(Request = 'QueryType')
 
-def create_plist_validate_pair(host_id):
+def create_lockdown_message_validate_pair(host_id):
   return dict(
     PairRecord = dict(HostID = host_id),
     Request = 'ValidatePair',
@@ -370,9 +371,6 @@ def create_plist_validate_pair(host_id):
 
 def print_device_info(device):
   print '\t', 'did:', device.DeviceID, '| sn:', device.Properties.SerialNumber, '| contype:', device.Properties.ConnectionType, '| pid: {0}'.format(device.Properties.ProductID) if 'ProductID' in device.Properties else ''
-
-
-SERVICE_TYPE_LOCKDOWN = 'com.apple.mobile.lockdown'
 
 
 #
@@ -384,7 +382,7 @@ class TestGetDeviceList(object):
     self.connection = Connection(io_service, connect())
     self.internal_session = UsbMuxSession(self.connection)
     logger().debug('Getting device list...')
-    self.internal_session.send(create_usbmux_plist_list_devices(), self.on_devices)
+    self.internal_session.send(create_usbmux_message_list_devices(), self.on_devices)
 
   def on_devices(self, devices):
     print 'device list:'
@@ -392,7 +390,7 @@ class TestGetDeviceList(object):
       print_device_info(i)
     #
     logger().debug('Getting buid...')
-    self.internal_session.send(create_usbmux_plist_read_buid(), self.on_buid)
+    self.internal_session.send(create_usbmux_message_read_buid(), self.on_buid)
 
   def on_buid(self, buid):
     print 'buid:'
@@ -415,7 +413,7 @@ class TestListenForDevices(object):
     self.internal_session.on_notification = self.on_notification
     #
     logger().debug('Listening for devices...')
-    self.internal_session.send(create_usbmux_plist_listen(), self.on_listen)
+    self.internal_session.send(create_usbmux_message_listen(), self.on_listen)
 
   def on_listen(self, confirmation):
     logger().debug('Listen confirmed')
@@ -433,70 +431,165 @@ class TestListenForDevices(object):
 
 
 #
+# ConnectToUsbMuxdWLink
+#
+
+class ConnectToUsbMuxdWLink(wl.WorkflowLink):
+  def __init__(self, data):
+    super(ConnectToUsbMuxdWLink, self).__init__()
+    self.data = data
+
+  def proceed(self):
+    self.data.connection = Connection(self.data.io_service, connect())
+    self.data.session = UsbMuxSession(self.data.connection)
+    self.next()
+
+
+#
+# ReadPairRecordWLink
+#
+
+class ReadPairRecordWLink(wl.WorkflowLink):
+  def __init__(self, data):
+    super(ReadPairRecordWLink, self).__init__()
+    self.data = data
+
+  def proceed(self):
+    logger().debug('Reading pair record of a device with a sn = {0}'.format(self.data.sn))
+    self.data.session.send(create_usbmux_message_read_pair_record(self.data.sn), self.on_get_pair_record)
+  
+  def on_get_pair_record(self, result):
+    if 'PairRecordData' not in result:
+      print 'Invalid pair record result.'
+      self.stopOthers()
+    else:
+      self.data.pair_record_data = plist.loads(result.PairRecordData.data.decode('utf-8'))
+      logger().debug('Done. HostID = {0}'.format(self.data.pair_record_data.HostID))
+      self.next();
+
+
+#
+# ConnectToLockdownWLink
+#
+
+class ConnectToLockdownWLink(wl.WorkflowLink):
+  LOCKDOWN_SERVICE_PORT = 32498
+
+  def __init__(self, data):
+    super(ConnectToLockdownWLink, self).__init__()
+    self.data = data
+
+  def proceed(self):
+    logger().debug('Connecting to the Lockdown service of a device with did = {0}'.format(self.data.did))
+    self.data.session.send(create_usbmux_message_connect(self.data.did, self.LOCKDOWN_SERVICE_PORT), self.on_connect_to_lockdown)
+
+  def on_connect_to_lockdown(self, confirmation):
+    if confirmation.Number != 0:
+      print 'Failed to connect with an error =', confirmation.Number
+      self.stopOthers()
+    else:
+      logger().debug('Done')
+      self.data.session = LockdownSession(self.data.connection)
+      self.next();
+
+
+#
+# CheckLockdownTypeWLink
+#
+
+class CheckLockdownTypeWLink(wl.WorkflowLink):
+  LOCKDOWN_SERVICE_TYPE = 'com.apple.mobile.lockdown'
+
+  def __init__(self, data):
+    super(CheckLockdownTypeWLink, self).__init__()
+    self.data = data
+
+  def proceed(self):
+    logger().debug('Checking service type...')
+    self.data.session.send(create_lockdown_message_query_type(), self.on_check_lockdown_type)
+
+  def on_check_lockdown_type(self, result):
+    if 'Type' not in result or result.Type != self.LOCKDOWN_SERVICE_TYPE:
+      print 'Failed to query the lockdown service type. Answer:', result
+      self.stopOthers()
+    else:
+      logger().debug('Done. Service type is: {0}.'.format(result.Type))
+      self.next();
+
+
+#
+# ValidatePairRecordWLink
+#
+
+class ValidatePairRecordWLink(wl.WorkflowLink):
+  def __init__(self, data):
+    super(ValidatePairRecordWLink, self).__init__()
+    self.data = data
+
+  def proceed(self):
+    logger().debug('Validating pair record with HostID = {0}'.format(self.data.pair_record_data['HostID']))
+    self.data.session.send(create_lockdown_message_validate_pair(self.data.pair_record_data['HostID']), self.on_validate_pair_record)
+
+  def on_validate_pair_record(self, result):
+    if 'Error' in result:
+      print 'Failed to validate pair. Error:', result['Error']
+      self.stopOthers()
+    else:
+      logger().debug('Done.')
+      self.next();
+
+
+#
+# CloseWLink
+#
+
+class CloseWLink(wl.WorkflowLink):
+  def __init__(self, data):
+    super(CloseWLink, self).__init__()
+    self.data = data
+
+  def block(self):
+    self.data.close()
+
+  def proceed(self):
+    self.block()
+
+
+#
 # TestConnectToLockdown
 #
 
 class TestConnectToLockdown(object):
   def __init__(self, io_service, did, sn):
+    self.io_service = io_service
     self.did = did
     self.sn = sn
+    self.connection = None
+    self.service = None
     self.pair_record_data = None
-    self.connection = Connection(io_service, connect())
-    self.internal_session = UsbMuxSession(self.connection)
     #
-    self.read_pair_record()
-
-  def on_get_pair_record(self, result):
-    self.pair_record_data = plist.loads(result.PairRecordData.data.decode('utf-8'))
-    self.connect_to_lockdown()
-
-  def on_connect_to_lockdown(self, confirmation):
-    if confirmation.Number != 0:
-      print 'Failed to connect to the lockdown service of the device with a did:', self.did
-      self.close()
-    self.internal_session = LockdownSession(self.connection)
-    self.check_lockdown_type()
-
-  def on_check_lockdown_type(self, result):
-    if result.Type != SERVICE_TYPE_LOCKDOWN:
-      print 'Failed to query the lockdown service type.'
-      self.close()
-    self.validate_pair_record()
-
-  def on_validate_pair_record(self, result):
-    if 'Error' in result:
-      print 'Failed to validate pair. Error:', result['Error']
-    self.close()
-
-  def read_pair_record(self):
-    logger().debug('Reading pair record...')
-    self.internal_session.send(create_usbmux_read_pair_record(self.sn), self.on_get_pair_record)
-
-  def connect_to_lockdown(self):
-    logger().debug('Connecting to lockdown...')
-    self.internal_session.send(create_usbmux_plist_connect(self.did, 32498), self.on_connect_to_lockdown)
-
-  def check_lockdown_type(self):
-    logger().debug('Quering service type...')
-    self.internal_session.send(create_plist_query_type(), self.on_check_lockdown_type)
-
-  def validate_pair_record(self):
-    logger().debug('Validating pair record...')
-    self.internal_session.send(create_plist_validate_pair(self.pair_record_data['HostID']), self.on_validate_pair_record)
+    workflow = wl.link_workflow(
+      ConnectToUsbMuxdWLink(self),
+      ReadPairRecordWLink(self),
+      ConnectToLockdownWLink(self),
+      CheckLockdownTypeWLink(self),
+      ValidatePairRecordWLink(self),
+      CloseWLink(self))
+    workflow.start()
 
   def close(self):
     self.connection.close()
 
 
 def Main():
-  print "Acronis Mobile Backup for Apple devices."
+  print "Acronis Mobile Backup prototype for Apple devices."
   configure_logger()
   logger().info('Current platform: {0}'.format(sys.platform))
 
   io_service = IOService()
 #  TestGetDeviceList(io_service)
 #  TestListenForDevices(io_service)
-  TestConnectToLockdown(io_service, 776, 'fe4121986da469cbd4ff59fce5cb8383aee5e120')
+  TestConnectToLockdown(io_service, 998, 'fe4121986da469cbd4ff59fce5cb8383aee5e120')
   io_service.run()
 
 
