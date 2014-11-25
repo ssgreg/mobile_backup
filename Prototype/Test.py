@@ -93,6 +93,7 @@ class Connection(object):
     return data
 
   def enable_ssl(self, cert=None, key=None):
+    logger().debug('SSL has been enabled.')
     cert_file = tempfile.NamedTemporaryFile(delete=False) if cert else None
     key_file = tempfile.NamedTemporaryFile(delete=False) if key else None
     try:
@@ -628,10 +629,8 @@ class LockdownStartSessionWLink(wl.WorkflowLink):
       use_ssl = result.EnableSessionSSL
       logger().debug('Done. SessionID = {0}, UseSSL = {1}'.format(session_id, use_ssl))
       if use_ssl:
-        self.data.session.enable_ssl(self.data.pair_record_data.RootCertificate.data, self.data.pair_record_data.RootPrivateKey.data)
+        self.data.session.enable_ssl(self.data.pair_record_data.HostCertificate.data, self.data.pair_record_data.HostPrivateKey.data)
       self.next();
-
-# com.apple.mobile.notification_proxy
 
 
 #
@@ -648,16 +647,12 @@ class LockdownStartServiceWLink(wl.WorkflowLink):
     self.data.session.send(create_lockdown_message_start_service('com.apple.mobile.notification_proxy'), self.on_start_service)
 
   def on_start_service(self, result):
-    print result
-    self.stopOthers()
-    # if 'Error' in result:
-    #   print 'Failed to start session. Error:', result['Error']
-    #   self.stopOthers()
-    # else:
-    #   session_id = result.SessionID
-    #   use_ssl = result.EnableSessionSSL
-    #   logger().debug('Done. SessionID = {0}, UseSSL = {1}'.format(session_id, use_ssl))
-    #   self.next();
+    if 'Error' in result:
+      print 'Failed to start service. Error:', result['Error']
+      self.stopOthers()
+    else:
+      logger().debug('Done. Port = {0}'.format(result.Port))
+      self.next();
 
 
 #
@@ -892,3 +887,11 @@ Main()
 # {'SessionID': 'BC9AC243-C6A8-4012-8EB7-E2A980EF3B7D', 'EnableSessionSSL': True, 'Request': 'StartSession'}
 # failure:
 # {'Request': 'StartSession', 'Error': 'InvalidHostID'}
+
+
+# start service:
+# success:
+# {'Request': 'StartService', 'Port': 51972, 'Service': 'com.apple.mobile.notification_proxy'}
+# failure:
+# {'Request': 'StartService', 'Service': 'com.apple.mobile.notification_proxy1', 'Error': 'InvalidService'}
+
