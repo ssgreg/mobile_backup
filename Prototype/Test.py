@@ -469,6 +469,29 @@ class ReadPairRecordWLink(wl.WorkflowLink):
 
 
 #
+# ReadBuidWLink
+#
+
+class ReadBuidWLink(wl.WorkflowLink):
+  def __init__(self, data):
+    super(ReadBuidWLink, self).__init__()
+    self.data = data
+
+  def proceed(self):
+    logger().debug('Reading BUID')
+    self.data.session.send(create_usbmux_message_read_buid(), self.on_read_buid)
+  
+  def on_read_buid(self, result):
+    if 'BUID' not in result:
+      print 'Invalid BUID result.'
+      self.stopOthers()
+    else:
+      self.data.buid = result.BUID
+      logger().debug('Done. BUID = {0}'.format(self.data.buid))
+      self.next();
+
+
+#
 # ConnectToLockdownWLink
 #
 
@@ -513,7 +536,7 @@ class CheckLockdownTypeWLink(wl.WorkflowLink):
       print 'Failed to query the lockdown service type. Answer:', result
       self.stopOthers()
     else:
-      logger().debug('Done. Service type is: {0}.'.format(result.Type))
+      logger().debug('Done. Service type is: {0}'.format(result.Type))
       self.next();
 
 
@@ -570,6 +593,7 @@ class TestConnectToLockdown(object):
     #
     workflow = wl.link_workflow(
       ConnectToUsbMuxdWLink(self),
+      ReadBuidWLink(self),
       ReadPairRecordWLink(self),
       ConnectToLockdownWLink(self),
       CheckLockdownTypeWLink(self),
