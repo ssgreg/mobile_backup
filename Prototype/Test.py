@@ -6,9 +6,12 @@ import sched
 import select
 import time
 import collections
+import os
 import sys
+import ssl
 import logging
 import logging.config
+import tempfile
 import wl
 
 
@@ -66,25 +69,47 @@ class IOService(object):
 
 class Connection(object):
   def __init__(self, service, io):
+    self.__io_original = io
     self.__io = io
     self.__service = service
     self.__service.register(io, self.__on_ready_to_recv)
     self.on_ready_to_recv = lambda: None
 
   def close(self):
-    self.__service.unregister(self.__io)
+    self.__service.unregister(self.__io_original)
+    if self.__io != self.__io_original:
+      self.__io_original.close()
     self.__io.close()
 
   def send(self, data):
-    # print('CON[{}] <-- ({}) {}'.format(id(self.__io), len(data), binascii.hexlify(data)))
+#    print('CON[{}] <-- ({}) {}'.format(id(self.__io), len(data), binascii.hexlify(data)))
     self.__io.send(data)
 
   def recv(self, size):
-#    print('CON[{}] --> ({}) {}'.format(id(self.io), len(data), binascii.hexlify(data)))
     data = self.__io.recv(size)
+#    print('CON[{}] --> ({}) {}'.format(id(self.__io), len(data), binascii.hexlify(data)))
     if not data:
       raise RuntimeError('Connection forcibly closed.')
     return data
+
+  def enable_ssl(self, cert=None, key=None):
+    cert_file = tempfile.NamedTemporaryFile(delete=False) if cert else None
+    key_file = tempfile.NamedTemporaryFile(delete=False) if key else None
+    try:
+      if cert:
+        cert_file.write(cert)
+        cert_file.close()
+        cert_file = cert_file.name
+      if key:
+        key_file.write(key)
+        key_file.close()
+        key_file = key_file.name
+      self.__io = ssl.wrap_socket(self.__io, certfile=cert_file, keyfile=key_file, ssl_version=3)
+    finally:
+      if cert:
+        os.remove(cert_file)
+      if key:
+        os.remove(key_file)
 
   def __on_ready_to_recv(self):
     self.on_ready_to_recv()
@@ -293,6 +318,7 @@ class LockdownSession(object):
   FIELD_REQUEST = 'Request'
 
   def __init__(self, connection):
+    self.__connection = connection
     self.__channel = PlistChannel(connection)
     self.__channel.on_incoming_plist = self.__on_incoming_plist
     self.reset()
@@ -307,11 +333,15 @@ class LockdownSession(object):
 
   def __on_incoming_plist(self, plist_data):
     if self.FIELD_REQUEST not in plist_data or plist_data[self.FIELD_REQUEST] != self.original_request:
-      raise RuntimeError('Lockdown recieved incorrect data.')
+      raise RuntimeError('Lockdown received incorrect data.')
     # store callback locally to avoid problems with calling 'send' in callback
     callback = self.callback
     self.reset()
     callback(plist_data)
+
+
+  def enable_ssl(self, cert, key):
+    self.__connection.enable_ssl(cert, key)
 
   def reset(self):
     self.callback = None
@@ -364,9 +394,23 @@ def create_lockdown_message_query_type():
 
 def create_lockdown_message_validate_pair(host_id):
   return dict(
+    Label='test',
     PairRecord = dict(HostID = host_id),
     Request = 'ValidatePair',
     ProtocolVersion = '2')
+
+def create_lockdown_message_start_session(host_id, buid):
+  return dict(
+    Label='test',
+    Request='StartSession',
+    HostID=host_id,
+    SystemBUID=buid)
+
+def create_lockdown_message_start_service(service):
+  return dict(
+    Label='test',
+    Request='StartService',
+    Service=service)
 
 
 def print_device_info(device):
@@ -563,6 +607,60 @@ class ValidatePairRecordWLink(wl.WorkflowLink):
 
 
 #
+# LockdownStartSessionWLink
+#
+
+class LockdownStartSessionWLink(wl.WorkflowLink):
+  def __init__(self, data):
+    super(LockdownStartSessionWLink, self).__init__()
+    self.data = data
+
+  def proceed(self):
+    logger().debug('Starting lockdown session with HostID = {0} and BUID = {1}'.format(self.data.pair_record_data['HostID'], self.data.buid))
+    self.data.session.send(create_lockdown_message_start_session(self.data.pair_record_data['HostID'], self.data.buid), self.on_start_session)
+
+  def on_start_session(self, result):
+    if 'Error' in result:
+      print 'Failed to start session. Error:', result['Error']
+      self.stopOthers()
+    else:
+      session_id = result.SessionID
+      use_ssl = result.EnableSessionSSL
+      logger().debug('Done. SessionID = {0}, UseSSL = {1}'.format(session_id, use_ssl))
+      if use_ssl:
+        self.data.session.enable_ssl(self.data.pair_record_data.RootCertificate.data, self.data.pair_record_data.RootPrivateKey.data)
+      self.next();
+
+# com.apple.mobile.notification_proxy
+
+
+#
+# LockdownStartServiceWLink
+#
+
+class LockdownStartServiceWLink(wl.WorkflowLink):
+  def __init__(self, data):
+    super(LockdownStartServiceWLink, self).__init__()
+    self.data = data
+
+  def proceed(self):
+    logger().debug('Starting {0} via Lockdown'.format('com.apple.mobile.notification_proxy'))
+    self.data.session.send(create_lockdown_message_start_service('com.apple.mobile.notification_proxy'), self.on_start_service)
+
+  def on_start_service(self, result):
+    print result
+    self.stopOthers()
+    # if 'Error' in result:
+    #   print 'Failed to start session. Error:', result['Error']
+    #   self.stopOthers()
+    # else:
+    #   session_id = result.SessionID
+    #   use_ssl = result.EnableSessionSSL
+    #   logger().debug('Done. SessionID = {0}, UseSSL = {1}'.format(session_id, use_ssl))
+    #   self.next();
+
+
+#
 # CloseWLink
 #
 
@@ -572,6 +670,7 @@ class CloseWLink(wl.WorkflowLink):
     self.data = data
 
   def block(self):
+    logger().debug('Closing connection...')
     self.data.close()
 
   def proceed(self):
@@ -598,6 +697,8 @@ class TestConnectToLockdown(object):
       ConnectToLockdownWLink(self),
       CheckLockdownTypeWLink(self),
       ValidatePairRecordWLink(self),
+      LockdownStartSessionWLink(self),
+      LockdownStartServiceWLink(self),
       CloseWLink(self))
     workflow.start()
 
@@ -613,7 +714,7 @@ def Main():
   io_service = IOService()
 #  TestGetDeviceList(io_service)
 #  TestListenForDevices(io_service)
-  TestConnectToLockdown(io_service, 998, 'fe4121986da469cbd4ff59fce5cb8383aee5e120')
+  TestConnectToLockdown(io_service, 1032, 'fe4121986da469cbd4ff59fce5cb8383aee5e120')
   io_service.run()
 
 
@@ -785,3 +886,9 @@ Main()
 # unsuccess: (invalid host id)
 # {'Request': 'ValidatePair', 'Error': 'InvalidHostID'}
 
+
+# start session:
+# success:
+# {'SessionID': 'BC9AC243-C6A8-4012-8EB7-E2A980EF3B7D', 'EnableSessionSSL': True, 'Request': 'StartSession'}
+# failure:
+# {'Request': 'StartSession', 'Error': 'InvalidHostID'}
