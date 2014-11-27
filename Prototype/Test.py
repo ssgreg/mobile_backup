@@ -661,20 +661,22 @@ class LockdownStartServiceWLink(wl.WorkflowLink):
 
 
 #
-# CloseWLink
+# LambdaWLink
 #
 
-class CloseWLink(wl.WorkflowLink):
-  def __init__(self, data):
-    super(CloseWLink, self).__init__()
-    self.data = data
+class LambdaWLink(wl.WorkflowLink):
+  def __init__(self, on_perform, on_block=None):
+    super(LambdaWLink, self).__init__()
+    self.on_perform = on_perform
+    self.on_block = on_block
 
   def block(self):
-    logger().debug('Closing connection...')
-    self.data.close()
+    if self.on_block:
+      self.on_block()
 
   def proceed(self):
-    self.block()
+    if self.on_perform():
+      self.next()
 
 
 #
@@ -682,15 +684,16 @@ class CloseWLink(wl.WorkflowLink):
 #
 
 class TestConnectToLockdown(object):
-  def __init__(self, io_service, did, sn):
+  def __init__(self, io_service):
     self.io_service = io_service
-    self.did = did
-    self.sn = sn
     self.connection = None
     self.service = None
     self.pair_record_data = None
-    #
+
+  def connect(self, did, sn, on_result):
     print('Connecting to the device with did = {0} and sn = {1}'.format(did, sn))
+    self.did = did
+    self.sn = sn
     #
     workflow = wl.link_workflow(
       ConnectToUsbMuxdWLink(self),
@@ -701,10 +704,11 @@ class TestConnectToLockdown(object):
       ValidatePairRecordWLink(self),
       LockdownStartSessionWLink(self),
       LockdownStartServiceWLink(self),
-      CloseWLink(self))
+      LambdaWLink(self.close, self.close))
     workflow.start()
 
   def close(self):
+    logger().debug('Closing connection...')
     self.connection.close()
 
 
@@ -730,7 +734,8 @@ def command_listen(args, io_service):
   TestListenForDevices(io_service, args.timeout)
 
 def command_test(args, io_service):
-  TestConnectToLockdown(io_service, args.did, args.sn)
+  test = TestConnectToLockdown(io_service)
+  test.connect(args.did, args.sn, None)
 
 
 def Main():
