@@ -50,7 +50,7 @@ class IOService(object):
   def run(self):
     while True:
       self.scheduler.run()
-      if len(self.__rxh.ios) != 0:
+      if self.has_io():
         self.__process_io()
       else:
         break
@@ -58,11 +58,17 @@ class IOService(object):
   def stopped(self):
     return self.stop_flag
 
+  def has_io(self):
+    return len(self.__rxh.ios) != 0
+
   def __process_io(self, timeout=None):
-    rios, tios, xios = select.select(self.__rxh.ios, self.__txh.ios, self.__xxh.ios, timeout)
-    for xh, signaled_ios in ((self.__rxh, rios), (self.__txh, tios), (self.__xxh, xios)):
-      for io in signaled_ios:
-        xh.x[io]()
+    if self.has_io():
+      rios, tios, xios = select.select(self.__rxh.ios, self.__txh.ios, self.__xxh.ios, timeout)
+      for xh, signaled_ios in ((self.__rxh, rios), (self.__txh, tios), (self.__xxh, xios)):
+        for io in signaled_ios:
+          xh.x[io]()
+    else:
+      time.sleep(timeout)
 
 
 #
