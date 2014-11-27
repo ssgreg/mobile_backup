@@ -12,6 +12,8 @@ import ssl
 import logging
 import logging.config
 import tempfile
+import argparse
+#
 import wl
 
 
@@ -357,7 +359,7 @@ def connect():
   else:
     logger().info('Connecting to the apple service...')
     sock = socket.socket()
-    sock.connect('127.0.0.1', 27015)
+    sock.connect(('127.0.0.1', 27015))
   return sock
 
 
@@ -433,13 +435,6 @@ class TestGetDeviceList(object):
     print 'device list:'
     for i in devices.DeviceList:
       print_device_info(i)
-    #
-    logger().debug('Getting buid...')
-    self.internal_session.send(create_usbmux_message_read_buid(), self.on_buid)
-
-  def on_buid(self, buid):
-    print 'buid:'
-    print '\t', buid
     self.close()
 
   def close(self):
@@ -451,8 +446,9 @@ class TestGetDeviceList(object):
 #
 
 class TestListenForDevices(object):
-  def __init__(self, io_service):
-    io_service.scheduler.enter(10, 1, self.close, ())
+  def __init__(self, io_service, timeout):
+    self.io_service = io_service
+    self.timeout = timeout
     self.connection = Connection(io_service, connect())
     self.internal_session = UsbMuxSession(self.connection)
     self.internal_session.on_notification = self.on_notification
@@ -462,14 +458,17 @@ class TestListenForDevices(object):
 
   def on_listen(self, confirmation):
     logger().debug('Listen confirmed')
+    self.io_service.scheduler.enter(self.timeout, 1, self.close, ())
 
   def on_notification(self, notification):
     if notification.MessageType == 'Attached':
       print 'Device attached:'
       print_device_info(notification)
+      sys.stdout.flush()
     else:
       print 'Device dettached:'
       print '\t', 'did:', notification.DeviceID
+      sys.stdout.flush()
 
   def close(self):
     self.connection.close()
@@ -685,6 +684,8 @@ class TestConnectToLockdown(object):
     self.service = None
     self.pair_record_data = None
     #
+    print('Connecting to the device with did = {0} and sn = {1}'.format(did, sn))
+    #
     workflow = wl.link_workflow(
       ConnectToUsbMuxdWLink(self),
       ReadBuidWLink(self),
@@ -701,16 +702,45 @@ class TestConnectToLockdown(object):
     self.connection.close()
 
 
+def configure_argparse():
+  parser = argparse.ArgumentParser()
+  subparsers = parser.add_subparsers(help='List of commands', dest='command')
+  #
+  list_parser = subparsers.add_parser('list', help='List')
+  #
+  listen_parser = subparsers.add_parser('listen', help='Listen')
+  listen_parser.add_argument('--timeout', '-t', type=int, default=10, help='timeout in seconds')
+  #
+  test_parser = subparsers.add_parser('test', help='Test')
+  test_parser.add_argument('--did', type=int, help='did')
+  test_parser.add_argument('--sn', type=str, help='sn')
+  return parser
+
+
+def command_list(args, io_service):
+  TestGetDeviceList(io_service)
+
+def command_listen(args, io_service):
+  TestListenForDevices(io_service, args.timeout)
+
+def command_test(args, io_service):
+  TestConnectToLockdown(io_service, args.did, args.sn)
+
+
 def Main():
-  print "Acronis Mobile Backup prototype for Apple devices."
+  print "Acronis Mobile Backup prototype for Apple devices 1.0"
   configure_logger()
   logger().info('Current platform: {0}'.format(sys.platform))
 
-  io_service = IOService()
-#  TestGetDeviceList(io_service)
-#  TestListenForDevices(io_service)
-  TestConnectToLockdown(io_service, 1096, 'fe4121986da469cbd4ff59fce5cb8383aee5e120')
-  io_service.run()
+  commands = {
+    'list': command_list,
+    'listen': command_listen,
+    'test': command_test
+  }
+  args = configure_argparse().parse_args()
 
+  io_service = IOService()
+  commands[args.command](args, io_service)
+  io_service.run()
 
 Main()
