@@ -1,8 +1,10 @@
 
-
 class WorkflowLink(object):
-  def __init__(self):
+  def __init__(self, data=None, **kwargs):
     self.__next = None
+    self.data = data or {}
+    if kwargs:
+      self.data = dict(self.data, **kwargs)
 
   def link(self, next):
     self.__next = next
@@ -15,7 +17,7 @@ class WorkflowLink(object):
     if self.__next:
       self.__next.stop()
 
-  def stopOthers(self):
+  def stop_next(self):
     if self.__next:
       self.__next.stop()
 
@@ -31,7 +33,8 @@ class WorkflowLink(object):
 
 
 
-def link_workflow(first, *wls):
+
+def link(first, *wls):
   cur = first
   for wl in wls:
     cur.link(wl)
