@@ -1,10 +1,11 @@
 
+
 class WorkflowLink(object):
   def __init__(self, data=None, **kwargs):
     self.__next = None
     self.data = data or {}
     if kwargs:
-      self.data = dict(self.data, **kwargs)
+      self.data.update(kwargs)
 
   def link(self, next):
     self.__next = next

@@ -1,5 +1,5 @@
 import socket
-import plist
+import plistlib
 import struct
 import binascii
 import sched
@@ -28,7 +28,7 @@ def logger():
 # IOService
 #
 
-class IOService(object):
+class IOService:
   def __init__(self):
     XHolder = collections.namedtuple('XHolder', 'ios, x')
     self.scheduler = sched.scheduler(time.time, self.__process_io)
@@ -75,18 +75,15 @@ class IOService(object):
 # Connection
 #
 
-class Connection(object):
+class Connection:
   def __init__(self, service, io):
-    self.__io_original = io
     self.__io = io
     self.__service = service
     self.__service.register(io, self.__on_ready_to_recv)
     self.on_ready_to_recv = lambda: None
 
   def close(self):
-    self.__service.unregister(self.__io_original)
-    if self.__io != self.__io_original:
-      self.__io_original.close()
+    self.__service.unregister(self.__io)
     self.__io.close()
 
   def send(self, data):
@@ -113,7 +110,9 @@ class Connection(object):
         key_file.write(key)
         key_file.close()
         key_file = key_file.name
+      self.__service.unregister(self.__io)
       self.__io = ssl.wrap_socket(self.__io, certfile=cert_file, keyfile=key_file, ssl_version=3)
+      self.__service.register(self.__io, self.__on_ready_to_recv)
     finally:
       if cert:
         os.remove(cert_file)
@@ -128,7 +127,7 @@ class Connection(object):
 # UsbMuxHeader
 #
 
-class UsbMuxHeader(object):
+class UsbMuxHeader:
   SIZE = 16
 
   def __init__(self, size=None, version=None, mtype=None, tag=None):
@@ -153,7 +152,7 @@ def makeUsbMuxHeader(size=None, version=None, mtype=None, tag=None):
 # PlistHeader
 #
 
-class PlistHeader(object):
+class PlistHeader:
   SIZE = 4
 
   def __init__(self, size=None):
@@ -174,7 +173,7 @@ def makePlistHeader(size=None):
 # MessageReceiver
 #
 
-class MessageReceiver(object):
+class MessageReceiver:
   def __init__(self, header_factory=None, header_size=None):
     self.__header_factory = header_factory
     self.__header_size = header_size
@@ -204,7 +203,7 @@ class MessageReceiver(object):
 # UsbMuxMessageChannel
 #
 
-class UsbMuxMessageChannel(object):
+class UsbMuxMessageChannel:
   USBMUX_VERSION = 1
 
   def __init__(self, connection):
@@ -230,7 +229,7 @@ class UsbMuxMessageChannel(object):
 # PlistMessageChannel
 #
 
-class PlistMessageChannel(object):
+class PlistMessageChannel:
   def __init__(self, connection):
     self.connection = connection
     self.connection.on_ready_to_recv = self.__on_ready_to_recv
@@ -254,7 +253,7 @@ class PlistMessageChannel(object):
 # UsbMuxPlistChannel
 #
 
-class UsbMuxPlistChannel(object):
+class UsbMuxPlistChannel:
   PLIST_MTYPE = 8
 
   def __init__(self, connection):
@@ -263,12 +262,12 @@ class UsbMuxPlistChannel(object):
     self.on_incoming_plist = lambda plist_data, tag: None
 
   def send(self, plist_data, tag):
-    self.internal_channel.send(plist.dumps(plist_data).encode('utf-8'), tag, self.PLIST_MTYPE)
+    self.internal_channel.send(plistlib.dumps(plist_data), tag, self.PLIST_MTYPE)
 
   def __on_incoming_message(self, data, tag, mtype):
     if mtype != self.PLIST_MTYPE:
       raise RuntimeError('Unsupported message type.')
-    plist_data = plist.loads(data.decode('utf-8'))
+    plist_data = plistlib.loads(data)
     self.on_incoming_plist(plist_data, tag)
 
 
@@ -276,17 +275,17 @@ class UsbMuxPlistChannel(object):
 # PlistChannel
 #
 
-class PlistChannel(object):
+class PlistChannel:
   def __init__(self, connection):
     self.internal_channel = PlistMessageChannel(connection)
     self.internal_channel.on_incoming_message = self.__on_incoming_message
     self.on_incoming_plist = lambda plist_data: None
 
   def send(self, plist_data):
-    self.internal_channel.send(plist.dumps(plist_data).encode('utf-8'))
+    self.internal_channel.send(plistlib.dumps(plist_data))
 
   def __on_incoming_message(self, data):
-    plist_data = plist.loads(data.decode('utf-8'))
+    plist_data = plistlib.loads(data)
     self.on_incoming_plist(plist_data)
 
 
@@ -294,7 +293,7 @@ class PlistChannel(object):
 # UsbMuxSession
 #
 
-class UsbMuxSession(object):
+class UsbMuxSession:
   TAG_NOTIFICATION = 0
   TAG_FIRST = 0x1000000
 
@@ -323,7 +322,7 @@ class UsbMuxSession(object):
 # LockdownSession
 #
 
-class LockdownSession(object):
+class LockdownSession:
   FIELD_REQUEST = 'Request'
 
   def __init__(self, connection):
@@ -390,7 +389,7 @@ def create_usbmux_message_listen():
 def create_usbmux_message_connect(did, port):
   plist_data = create_usbmux_message('Connect')
   plist_data['DeviceID'] = did
-  plist_data['PortNumber'] = port
+  plist_data['PortNumber'] = socket.htons(port)
   return plist_data
 
 def create_usbmux_message_read_pair_record(sn):
@@ -423,14 +422,18 @@ def create_lockdown_message_start_service(service):
 
 
 def print_device_info(device):
-  print '\t', 'did:', device.DeviceID, '| sn:', device.Properties.SerialNumber, '| contype:', device.Properties.ConnectionType, '| pid: {0}'.format(device.Properties.ProductID) if 'ProductID' in device.Properties else ''
+  print('\t'
+    , 'did:', device['DeviceID']
+    , '| sn:', device['Properties']['SerialNumber']
+    , '| contype:', device['Properties']['ConnectionType']
+    , '| pid: {0}'.format(device['Properties']['ProductID']) if 'ProductID' in device['Properties'] else '')
 
 
 #
 # TestGetDeviceList
 #
 
-class TestGetDeviceList(object):
+class TestGetDeviceList:
   def __init__(self, io_service):
     self.connection = Connection(io_service, connect())
     self.internal_session = UsbMuxSession(self.connection)
@@ -438,8 +441,8 @@ class TestGetDeviceList(object):
     self.internal_session.send(create_usbmux_message_list_devices(), self.on_devices)
 
   def on_devices(self, devices):
-    print 'device list:'
-    for i in devices.DeviceList:
+    print('device list:')
+    for i in devices['DeviceList']:
       print_device_info(i)
     self.close()
 
@@ -451,7 +454,7 @@ class TestGetDeviceList(object):
 # TestListenForDevices
 #
 
-class TestListenForDevices(object):
+class TestListenForDevices:
   def __init__(self, io_service, timeout):
     self.io_service = io_service
     self.timeout = timeout
@@ -467,13 +470,13 @@ class TestListenForDevices(object):
     self.io_service.scheduler.enter(self.timeout, 1, self.close, ())
 
   def on_notification(self, notification):
-    if notification.MessageType == 'Attached':
-      print 'Device attached:'
+    if notification['MessageType'] == 'Attached':
+      print('Device attached:')
       print_device_info(notification)
       sys.stdout.flush()
     else:
-      print 'Device dettached:'
-      print '\t', 'did:', notification.DeviceID
+      print('Device dettached:')
+      print('\t', 'did:', notification['DeviceID'])
       sys.stdout.flush()
 
   def close(self):
@@ -502,11 +505,11 @@ class ReadPairRecordWLink(wl.WorkflowLink):
   
   def on_get_pair_record(self, result):
     if 'PairRecordData' not in result:
-      print 'Invalid pair record result.'
+      print('Invalid pair record result.')
       self.stop_next()
     else:
-      self.data['pair_record_data'] = plist.loads(result.PairRecordData.data.decode('utf-8'))
-      logger().debug('Done. HostID = {0}'.format(self.data['pair_record_data'].HostID))
+      self.data['pair_record_data'] = plistlib.loads(result['PairRecordData'])
+      logger().debug('Done. HostID = {0}'.format(self.data['pair_record_data']['HostID']))
       self.next();
 
 
@@ -521,32 +524,26 @@ class ReadBuidWLink(wl.WorkflowLink):
   
   def on_read_buid(self, result):
     if 'BUID' not in result:
-      print 'Invalid BUID result.'
+      print('Invalid BUID result.')
       self.stop_next()
     else:
-      self.data['BUID'] = result.BUID
+      self.data['BUID'] = result['BUID']
       logger().debug('Done. BUID = {0}'.format(self.data['BUID']))
       self.next();
 
 
 #
-# ConnectToLockdownWLink
+# ConnectToServiceWLink
 #
 
-class ConnectToLockdownWLink(wl.WorkflowLink):
-  LOCKDOWN_SERVICE_PORT = 32498
-
-  def __init__(self, data):
-    super(ConnectToLockdownWLink, self).__init__()
-    self.data = data
-
+class ConnectToServiceWLink(wl.WorkflowLink):
   def proceed(self):
-    logger().debug('Connecting to the Lockdown service of a device with did = {0}'.format(self.data['did']))
-    self.data['session'].send(create_usbmux_message_connect(self.data['did'], self.LOCKDOWN_SERVICE_PORT), self.on_connect_to_lockdown)
+    logger().debug('Connecting to a service, did = {0} port = {1}'.format(self.data['did'], self.data['service_port']))
+    self.data['session'].send(create_usbmux_message_connect(self.data['did'], self.data['service_port']), self.on_connect_to_lockdown)
 
   def on_connect_to_lockdown(self, confirmation):
-    if confirmation.Number != 0:
-      print 'Failed to connect with an error =', confirmation.Number
+    if confirmation['Number'] != 0:
+      print('Failed to connect with an error =', confirmation['Number'])
       self.stop_next()
     else:
       logger().debug('Done')
@@ -561,20 +558,16 @@ class ConnectToLockdownWLink(wl.WorkflowLink):
 class CheckLockdownTypeWLink(wl.WorkflowLink):
   LOCKDOWN_SERVICE_TYPE = 'com.apple.mobile.lockdown'
 
-  def __init__(self, data):
-    super(CheckLockdownTypeWLink, self).__init__()
-    self.data = data
-
   def proceed(self):
     logger().debug('Checking service type...')
     self.data['session'].send(create_lockdown_message_query_type(), self.on_check_lockdown_type)
 
   def on_check_lockdown_type(self, result):
-    if 'Type' not in result or result.Type != self.LOCKDOWN_SERVICE_TYPE:
-      print 'Failed to query the lockdown service type. Answer:', result
+    if 'Type' not in result or result['Type'] != self.LOCKDOWN_SERVICE_TYPE:
+      print('Failed to query the lockdown service type. Answer:', result)
       self.stop_next()
     else:
-      logger().debug('Done. Service type is: {0}'.format(result.Type))
+      logger().debug('Done. Service type is: {0}'.format(result['Type']))
       self.next();
 
 
@@ -583,17 +576,13 @@ class CheckLockdownTypeWLink(wl.WorkflowLink):
 #
 
 class ValidatePairRecordWLink(wl.WorkflowLink):
-  def __init__(self, data):
-    super(ValidatePairRecordWLink, self).__init__()
-    self.data = data
-
   def proceed(self):
-    logger().debug('Validating pair record with HostID = {0}'.format(self.data['pair_record_data'].HostID))
-    self.data['session'].send(create_lockdown_message_validate_pair(self.data['pair_record_data'].HostID), self.on_validate_pair_record)
+    logger().debug('Validating pair record with HostID = {0}'.format(self.data['pair_record_data']['HostID']))
+    self.data['session'].send(create_lockdown_message_validate_pair(self.data['pair_record_data']['HostID']), self.on_validate_pair_record)
 
   def on_validate_pair_record(self, result):
     if 'Error' in result:
-      print 'Failed to validate pair. Error:', result['Error']
+      print('Failed to validate pair. Error:', result['Error'])
       self.stop_next()
     else:
       logger().debug('Done.')
@@ -605,24 +594,20 @@ class ValidatePairRecordWLink(wl.WorkflowLink):
 #
 
 class LockdownStartSessionWLink(wl.WorkflowLink):
-  def __init__(self, data):
-    super(LockdownStartSessionWLink, self).__init__()
-    self.data = data
-
   def proceed(self):
-    logger().debug('Starting lockdown session with HostID = {0} and BUID = {1}'.format(self.data['pair_record_data'].HostID, self.data['BUID']))
-    self.data['session'].send(create_lockdown_message_start_session(self.data['pair_record_data'].HostID, self.data['BUID']), self.on_start_session)
+    logger().debug('Starting lockdown session with HostID = {0} and BUID = {1}'.format(self.data['pair_record_data']['HostID'], self.data['BUID']))
+    self.data['session'].send(create_lockdown_message_start_session(self.data['pair_record_data']['HostID'], self.data['BUID']), self.on_start_session)
 
   def on_start_session(self, result):
     if 'Error' in result:
-      print 'Failed to start session. Error:', result['Error']
+      print('Failed to start session. Error:', result['Error'])
       self.stop_next()
     else:
-      session_id = result.SessionID
-      use_ssl = result.EnableSessionSSL
+      session_id = result['SessionID']
+      use_ssl = result['EnableSessionSSL']
       logger().debug('Done. SessionID = {0}, UseSSL = {1}'.format(session_id, use_ssl))
       if use_ssl:
-        self.data['session'].enable_ssl(self.data['pair_record_data'].HostCertificate.data, self.data['pair_record_data'].HostPrivateKey.data)
+        self.data['session'].enable_ssl(self.data['pair_record_data']['HostCertificate'], self.data['pair_record_data']['HostPrivateKey'])
       self.next();
 
 
@@ -631,21 +616,17 @@ class LockdownStartSessionWLink(wl.WorkflowLink):
 #
 
 class LockdownStartServiceWLink(wl.WorkflowLink):
-  def __init__(self, data):
-    super(LockdownStartServiceWLink, self).__init__()
-    self.data = data
-
   def proceed(self):
     logger().debug('Starting {0} via Lockdown'.format(self.data['service_name']))
     self.data['session'].send(create_lockdown_message_start_service(self.data['service_name']), self.on_start_service)
 
   def on_start_service(self, result):
     if 'Error' in result:
-      print 'Failed to start service. Error:', result['Error']
+      print('Failed to start service. Error:', result['Error'])
       self.stop_next()
     else:
-      logger().debug('Done. Port = {0}'.format(result.Port))
-      self.data['port'] = result.Port
+      logger().debug('Done. Port = {0}'.format(result['Port']))
+      self.data['port'] = result['Port']
       self.next();
 
 
@@ -672,7 +653,9 @@ class LambdaWLink(wl.WorkflowLink):
 # LockdownService
 #
 
-class LockdownService(object):
+class LockdownService:
+  LOCKDOWN_SERVICE_PORT = 62078
+
   def __init__(self, io_service, did, sn):
     self.io_service = io_service
     self.did = did
@@ -687,7 +670,7 @@ class LockdownService(object):
       ConnectToUsbMuxdWLink(data),
       ReadBuidWLink(data),
       ReadPairRecordWLink(data),
-      ConnectToLockdownWLink(data),
+      ConnectToServiceWLink(data, service_port=self.LOCKDOWN_SERVICE_PORT),
       CheckLockdownTypeWLink(data),
       ValidatePairRecordWLink(data),
       LockdownStartSessionWLink(data),
@@ -710,12 +693,11 @@ class LockdownService(object):
 #
 
 class StartServiceViaLockdownWLink(wl.WorkflowLink):
-
   def proceed(self):
-    self.data['lockdown'].start_another_service(self.data['service_to_run'], self.on_start_requested_service)
+    self.data['lockdown'].start_another_service(self.data['service'], self.on_start_requested_service)
 
   def on_start_requested_service(self, port):
-    self.data['service_to_run_port'] = port
+    self.data['service_port'] = port
     self.next()
 
 
@@ -723,21 +705,29 @@ class StartServiceViaLockdownWLink(wl.WorkflowLink):
 # TestBackup
 #
 
-class TestBackup(object):
+class TestBackup:
   MOBILEBACKUP2_SERVICE_NAME = 'com.apple.mobilebackup2'
   NP_SERVICE_NAME = 'com.apple.mobile.notification_proxy'
 
   def __init__(self, io_service, did, sn):
-    data = dict(lockdown=LockdownService(io_service, did, sn))
+    data = dict(io_service=io_service, lockdown=LockdownService(io_service, did, sn), did=did, sn=sn)
     workflow = wl.link(
-      StartServiceViaLockdownWLink(data, service_to_run=self.NP_SERVICE_NAME),
-      LambdaWLink(lambda: self.__close(data), lambda: self.__close(data)))
+      StartServiceViaLockdownWLink(data, service=self.NP_SERVICE_NAME),
+      LambdaWLink(lambda: self.__close(data), lambda: self.__close(data)),
+      ConnectToUsbMuxdWLink(data),
+      ConnectToServiceWLink(data),
+      LambdaWLink(lambda: self.close(data), lambda: self.close(data)))
     workflow.start()
 
   def __close(self, data):
     if 'lockdown' in data:
       data['lockdown'].close()
+    return True
 
+  def close(self, data):
+    logger().debug('Closing connection...')
+    data['connection'].close()
+    return True
 
 
 def configure_argparse():
@@ -767,7 +757,7 @@ def command_test(args, io_service):
 
 
 def Main():
-  print "Acronis Mobile Backup prototype for Apple devices 1.0"
+  print("Acronis Mobile Backup prototype for Apple devices 1.0")
   configure_logger()
   logger().info('Current platform: {0}'.format(sys.platform))
 
