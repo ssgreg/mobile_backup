@@ -414,11 +414,14 @@ def create_lockdown_message_start_session(host_id, buid):
     HostID=host_id,
     SystemBUID=buid)
 
-def create_lockdown_message_start_service(service):
-  return dict(
+def create_lockdown_message_start_service(service, escrow_bag=None):
+  result = dict(
     Label='test',
     Request='StartService',
     Service=service)
+  if escrow_bag:
+    result['EscrowBag'] = escrow_bag
+  return result
 
 
 def print_device_info(device):
@@ -552,14 +555,14 @@ class ConnectToServiceWLink(wl.WorkflowLink):
 
 
 #
-# CheckLockdownTypeWLink
+# LockdownServiceCheckTypeWLink
 #
 
-class CheckLockdownTypeWLink(wl.WorkflowLink):
+class LockdownServiceCheckTypeWLink(wl.WorkflowLink):
   LOCKDOWN_SERVICE_TYPE = 'com.apple.mobile.lockdown'
 
   def proceed(self):
-    logger().debug('Checking service type...')
+    logger().debug('Checking lockdown service type...')
     self.data['session'].send(create_lockdown_message_query_type(), self.on_check_lockdown_type)
 
   def on_check_lockdown_type(self, result):
@@ -617,12 +620,15 @@ class LockdownStartSessionWLink(wl.WorkflowLink):
 
 class LockdownStartServiceWLink(wl.WorkflowLink):
   def proceed(self):
-    logger().debug('Starting {0} via Lockdown'.format(self.data['service_name']))
-    self.data['session'].send(create_lockdown_message_start_service(self.data['service_name']), self.on_start_service)
+    logger().debug('Starting {0} via Lockdown {1} escrow bag'.format(self.data['service_name'], "with" if self.data['use_escrow_bag'] else "without"))
+    escrow_bag = self.data['pair_record_data']['EscrowBag'] if self.data['use_escrow_bag'] else None
+    self.data['session'].send(create_lockdown_message_start_service(self.data['service_name'], escrow_bag), self.on_start_service)
 
   def on_start_service(self, result):
     if 'Error' in result:
       print('Failed to start service. Error:', result['Error'])
+      if result['Error'] == 'EscrowLocked':
+        print('It''s impossible to back up the device because it is locked with a passcode. You must enter a passcode on the device before it can be backed up.')
       self.stop_next()
     else:
       logger().debug('Done. Port = {0}'.format(result['Port']))
@@ -663,6 +669,12 @@ class LockdownService:
     self.connection = None
 
   def start_another_service(self, name, on_result):
+    self.__start_another_service(name, False, on_result)
+
+  def start_another_service_with_escrow_bag(self, name, on_result):
+    self.__start_another_service(name, True, on_result)
+
+  def __start_another_service(self, name, use_escrow_bag, on_result):
     data = dict(io_service=self.io_service, service_name=name, did=self.did, sn=self.sn)
     logger().debug('Starting service ''{0}'' with did = {1} and sn = {2}'.format(name, self.did, self.sn))
     #
@@ -671,12 +683,14 @@ class LockdownService:
       ReadBuidWLink(data),
       ReadPairRecordWLink(data),
       ConnectToServiceWLink(data, service_port=self.LOCKDOWN_SERVICE_PORT),
-      CheckLockdownTypeWLink(data),
+      LockdownServiceCheckTypeWLink(data),
       ValidatePairRecordWLink(data),
       LockdownStartSessionWLink(data),
-      LockdownStartServiceWLink(data),
+      LockdownStartServiceWLink(data, use_escrow_bag=use_escrow_bag),
       LambdaWLink(lambda: self.__call_on_result_for_start_another_service(on_result, data)))
     workflow.start()
+
+
 
   def __call_on_result_for_start_another_service(self, on_result, data):
     self.connection = data['connection']
@@ -694,7 +708,10 @@ class LockdownService:
 
 class StartServiceViaLockdownWLink(wl.WorkflowLink):
   def proceed(self):
-    self.data['lockdown'].start_another_service(self.data['service'], self.on_start_requested_service)
+    if self.data['use_escrow_bag']:
+      self.data['lockdown'].start_another_service_with_escrow_bag(self.data['service'], self.on_start_requested_service)
+    else:
+      self.data['lockdown'].start_another_service(self.data['service'], self.on_start_requested_service)
 
   def on_start_requested_service(self, port):
     self.data['service_port'] = port
@@ -711,11 +728,13 @@ class TestBackup:
 
   def __init__(self, io_service, did, sn):
     data = dict(io_service=io_service, lockdown=LockdownService(io_service, did, sn), did=did, sn=sn)
+    #
     workflow = wl.link(
-      StartServiceViaLockdownWLink(data, service=self.NP_SERVICE_NAME),
+      StartServiceViaLockdownWLink(data, service=self.MOBILEBACKUP2_SERVICE_NAME, use_escrow_bag=True),
       LambdaWLink(lambda: self.__close(data), lambda: self.__close(data)),
       ConnectToUsbMuxdWLink(data),
       ConnectToServiceWLink(data),
+      LockdownServiceCheckTypeWLink(data, service_type=self.MOBILEBACKUP2_SERVICE_NAME),
       LambdaWLink(lambda: self.close(data), lambda: self.close(data)))
     workflow.start()
 
