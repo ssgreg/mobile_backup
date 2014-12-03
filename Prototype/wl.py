@@ -1,8 +1,13 @@
+#
 
+#
+# WorkflowLink
+#
 
-class WorkflowLink(object):
+class WorkflowLink:
   def __init__(self, data=None, **kwargs):
     self.__next = None
+    self.__blocked = True
     self.data = data or {}
     if kwargs:
       self.data.update(kwargs)
@@ -10,10 +15,15 @@ class WorkflowLink(object):
   def link(self, next):
     self.__next = next
 
+  def blocked(self):
+    return self.__blocked
+
   def start(self):
+    self.__blocked = False
     self.proceed();
 
   def stop(self):
+    self.__blocked = True
     self.block();
     if self.__next:
       self.__next.stop()
@@ -25,14 +35,18 @@ class WorkflowLink(object):
   def block(self):
     pass
 
+  def if_not_blocked(self, fn):
+    if self.blocked():
+      fn()
+
   def proceed(self):
-    self.next();
+    self.next()
 
   def next(self):
+    if self.blocked():
+      raise RuntimeError('Failed to continue. WorkflowLink is blocked.')
     if self.__next:
       self.__next.start() 
-
-
 
 
 def link(first, *wls):
@@ -40,22 +54,65 @@ def link(first, *wls):
   for wl in wls:
     cur.link(wl)
     cur = wl
-  return first
+  return (first, cur)
+
+
+#
+# ProxyWorkflowLink
+#
+
+class ProxyWorkflowLink(WorkflowLink):
+  def __init__(self, on_perform, on_block=None):
+    super().__init__()
+    self.on_perform = on_perform
+    self.on_block = on_block
+
+  def block(self):
+    if self.on_block:
+      self.on_block()
+
+  def proceed(self):
+    if self.on_perform():
+      self.next()
+
+
+#
+# WorkflowBatch
+#
+
+class WorkflowBatch(WorkflowLink):
+  def __init__(self, first_wl, *wls):
+    super().__init__()
+    self.first_wl, self.last_wl = link(first_wl, *wls)
+    self.last_wl.link(ProxyWorkflowLink(self.on_last_proceed, self.on_last_block))
+
+  def proceed(self):
+    self.first_wl.start()
+
+  def block(self):
+    self.first_wl.stop()
+
+  def on_last_proceed(self):
+    self.next()
+
+  def on_last_block(self):
+    self.stop_next()
+
 
 
 # class TestWL(WorkflowLink):
 #   def proceed(self):
-#     print 'a'
+#     print('a')
 #     self.next()
 
 # class TestWL1(WorkflowLink):
 #   def proceed(self):
-#     print 'b'
+#     print('b')
 #     self.next()
 
 # class TestWL2(WorkflowLink):
 #   def proceed(self):
-#     print 'c'
+#     print('c')
 #     self.next()
 
 
@@ -63,7 +120,7 @@ def link(first, *wls):
 # b = TestWL1()
 # c = TestWL2()
 
-# w = link_workflow(a, b, c)
+# w = WorkflowBatch(a, b, c)
 # w.start()
 
 
