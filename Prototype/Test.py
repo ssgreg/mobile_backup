@@ -717,7 +717,7 @@ class LockdownService:
 
   def close(self):
     if 'connection' in self.data:
-      logger().debug('Closing internal connection...')
+      logger().debug('Closing lockdown connection...')
       self.data['connection'].close()
       self.data['connection'] = None
 
@@ -773,7 +773,7 @@ class NotificationProxyService:
 
   def close(self):
     if 'connection' in self.data:
-      logger().debug('Closing new connection...')
+      logger().debug('Closing notification proxy connection...')
       self.data['connection'].close()
 
 
