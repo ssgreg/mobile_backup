@@ -522,7 +522,6 @@ class TestListenForDevices:
 class ConnectToUsbMuxdWLink(wl.WorkflowLink):
   def proceed(self):
     self.data['connection'] = Connection(self.data['io_service'], connect())
-    self.data['session'] = UsbMuxSession(self.data['connection'])
     self.next()
 
 
@@ -577,10 +576,29 @@ class ConnectToServiceWLink(wl.WorkflowLink):
   def on_connect(self, confirmation):
     if confirmation['Number'] == 0:
       logger().debug('Done')
-      self.data['session'] = LockdownSession(self.data['connection'])
       self.next();
     else:
       raise RuntimeError('Failed to connect with an error = {0}'.format(confirmation['Number']))
+
+
+#
+# SessionChangeToLockdown
+#
+
+class SessionChangeToLockdown(wl.WorkflowLink):
+  def proceed(self):
+    self.data['session'] = LockdownSession(self.data['connection'])
+    self.next()
+
+
+#
+# SessionChangeToUsbMuxWLink
+#
+
+class SessionChangeToUsbMuxWLink(wl.WorkflowLink):
+  def proceed(self):
+    self.data['session'] = UsbMuxSession(self.data['connection'])
+    self.next()
 
 
 #
@@ -670,6 +688,15 @@ class LockdownStartServiceWLink(wl.WorkflowLink):
 
 
 #
+# ServiceVersionExchange
+#
+
+class ServiceVersionExchange(wl.WorkflowLink):
+  def proceed(self):
+    pass
+
+
+#
 # LockdownService
 #
 
@@ -687,9 +714,11 @@ class LockdownService:
     #
     workflow = wl.WorkflowBatch(
       ConnectToUsbMuxdWLink(self.data),
+      SessionChangeToUsbMuxWLink(self.data),
       ReadBuidWLink(self.data),
       ReadPairRecordWLink(self.data),
       ConnectToServiceWLink(self.data, service_port=self.LOCKDOWN_SERVICE_PORT),
+      SessionChangeToLockdown(self.data),
       LockdownServiceCheckTypeWLink(self.data),
       LockdownValidatePairRecordWLink(self.data),
       LockdownStartSessionWLink(self.data),
@@ -765,6 +794,7 @@ class NotificationProxyService:
   def connect(self, did, port, on_result):
     workflow = wl.WorkflowBatch(
       ConnectToUsbMuxdWLink(self.data),
+      SessionChangeToUsbMuxWLink(self.data),
       ConnectToServiceWLink(self.data, did=did, service_port=port),
 #      LockdownServiceCheckTypeWLink(self.data, service_type=self.NP_SERVICE_NAME),
       wl.ProxyWorkflowLink(on_result))
@@ -788,6 +818,41 @@ class ConnectToNotiticationProxyWLink(wl.WorkflowLink):
 
 
 #
+# MobileBackup2Service
+#
+
+class MobileBackup2Service:
+  def __init__(self, io_service):
+    self.io_service = io_service
+    self.data = dict(io_service=self.io_service)
+
+  def connect(self, did, port, on_result):
+    workflow = wl.WorkflowBatch(
+      ConnectToUsbMuxdWLink(self.data),
+      SessionChangeToUsbMuxWLink(self.data),
+      ConnectToServiceWLink(self.data, did=did, service_port=port),
+
+      wl.ProxyWorkflowLink(on_result))
+    workflow.start()
+
+
+  def close(self):
+    if 'connection' in self.data:
+      logger().debug('Closing mobilebackup2 connection...')
+      self.data['connection'].close()
+
+
+#
+# ConnectToMobileBackup2WLink
+#
+
+class ConnectToMobileBackup2WLink(wl.WorkflowLink):
+  def proceed(self):
+    self.data['mobilebackup2'].connect(self.data['did'], self.data['service_port'], lambda: self.blocked() or self.next())
+    self.stop_next()
+
+
+#
 # TestBackup
 #
 
@@ -801,7 +866,15 @@ class TestBackup:
     self.sn = sn
     self.lockdown = LockdownService(self.io_service)
     self.notification_proxy = NotificationProxyService(self.io_service)
-    self.data = dict(io_service=self.io_service, lockdown=self.lockdown, notification_proxy=self.notification_proxy, did=self.did, sn=self.sn)
+    self.mobilebackup2 = MobileBackup2Service(self.io_service)
+    self.data = dict(
+      io_service=self.io_service,
+      did=self.did,
+      sn=self.sn,
+      lockdown=self.lockdown,
+      notification_proxy=self.notification_proxy,
+      mobilebackup2=self.mobilebackup2
+    )
  
   def start(self):
     self.io_service.execute(self.on_enter)
@@ -814,6 +887,8 @@ class TestBackup:
       ConnectToLockdownWLink(self.data, did=self.did, sn = self.sn),
       StartServiceViaLockdownWLink(self.data, service=self.NP_SERVICE_NAME, use_escrow_bag=True),
       ConnectToNotiticationProxyWLink(self.data),
+      StartServiceViaLockdownWLink(self.data, service=self.MOBILEBACKUP2_SERVICE_NAME, use_escrow_bag=True),
+      ConnectToMobileBackup2WLink(self.data),
       wl.ProxyWorkflowLink(lambda: self.on_exit(None)))
     workflow.start()
 
@@ -825,6 +900,7 @@ class TestBackup:
       print(e)
     self.lockdown.close()
     self.notification_proxy.close()
+    self.mobilebackup2.close()
 
 
 def configure_argparse():
