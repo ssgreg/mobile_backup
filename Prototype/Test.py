@@ -478,6 +478,12 @@ def create_lockdown_message_start_service(service, escrow_bag=None):
     result['EscrowBag'] = escrow_bag
   return result
 
+def create_service_message_dl_version_ok(major, minor):
+  return [
+    'DLMessageVersionExchange',
+    'DLVersionsOk',
+    major
+  ]
 
 def print_device_info(device):
   print('\t'
@@ -829,6 +835,8 @@ class StartServiceViaLockdownWLink(wl.WorkflowLink):
 #
 
 class NotificationProxyService:
+  SERVICE_NAME = 'com.apple.mobile.notification_proxy'
+
   def __init__(self, io_service):
     self.io_service = io_service
     self.data = dict(io_service=self.io_service)
@@ -859,31 +867,45 @@ class ConnectToNotiticationProxyWLink(wl.WorkflowLink):
     self.stop_next()
 
 
-class VersionExchangeWLink(wl.WorkflowLink):
+#
+# DeviceLinkVersionExchangeWLink
+#
+
+class DeviceLinkVersionExchangeWLink(wl.WorkflowLink):
   VERSION_MAJOR = 300
   VERSION_MINOR = 0
 
   def proceed(self):
     logger().debug('Waiting for version exchange. Expected version is: {0}.{1}'.format(self.VERSION_MAJOR, self.VERSION_MINOR))
-    self.data['session'].on_notification = lambda x: self.blocked() or self.on_version_exchange(x)
+    self.data['session'].on_notification = lambda x: self.blocked() or self.on_handshake(x)
     self.stop_next()
 
-  def on_version_exchange(self, query):
+  def on_handshake(self, query):
     self.data['session'].on_notification = None
     if 'DLMessageVersionExchange' in query and len(query) == 3:
       if query[1] > self.VERSION_MAJOR or (query[1] > self.VERSION_MAJOR and query[2] > self.VERSION_MINOR):
         raise RuntimeError('Version exchange failed. Device version is: {0}.{1}'.format(query[1], query[2]))
       else:
-        logger().debug('Done. Device version is: {0}.{1}'.format(query[1], query[2]))
-        self.next()
+        logger().debug('Device version is: {0}.{1}'.format(query[1], query[2]))
+        self.data['session'].send(create_service_message_dl_version_ok(query[1], query[2]), lambda x: self.blocked() or self.on_version_exchange(x))
     else:
       raise RuntimeError('Version exchange failed.')
+
+  def on_version_exchange(self, result):
+    if 'DLMessageDeviceReady' in result:
+      logger().debug('Done')
+      self.next()
+    else:
+      raise RuntimeError('Version exchange failed.')
+
 
 #
 # MobileBackup2Service
 #
 
 class MobileBackup2Service:
+  SERVICE_NAME = 'com.apple.mobilebackup2'
+
   def __init__(self, io_service):
     self.io_service = io_service
     self.data = dict(io_service=self.io_service)
@@ -894,7 +916,7 @@ class MobileBackup2Service:
       SessionChangeToUsbMuxWLink(self.data),
       ConnectToServiceWLink(self.data, did=did, service_port=port),
       SessionChangeToCommonService(self.data),
-      VersionExchangeWLink(self.data),
+      DeviceLinkVersionExchangeWLink(self.data),
       wl.ProxyWorkflowLink(on_result))
     workflow.start()
 
@@ -920,9 +942,6 @@ class ConnectToMobileBackup2WLink(wl.WorkflowLink):
 #
 
 class TestBackup:
-  MOBILEBACKUP2_SERVICE_NAME = 'com.apple.mobilebackup2'
-  NP_SERVICE_NAME = 'com.apple.mobile.notification_proxy'
-
   def __init__(self, io_service, did, sn):
     self.io_service = SafeIOService(io_service, self.on_exit)
     self.did = did
@@ -948,9 +967,9 @@ class TestBackup:
   def on_enter(self):
     workflow = wl.WorkflowBatch(
       ConnectToLockdownWLink(self.data, did=self.did, sn = self.sn),
-      StartServiceViaLockdownWLink(self.data, service=self.NP_SERVICE_NAME, use_escrow_bag=True),
+      StartServiceViaLockdownWLink(self.data, service=NotificationProxyService.SERVICE_NAME, use_escrow_bag=True),
       ConnectToNotiticationProxyWLink(self.data),
-      StartServiceViaLockdownWLink(self.data, service=self.MOBILEBACKUP2_SERVICE_NAME, use_escrow_bag=True),
+      StartServiceViaLockdownWLink(self.data, service=MobileBackup2Service.SERVICE_NAME, use_escrow_bag=True),
       ConnectToMobileBackup2WLink(self.data),
       wl.ProxyWorkflowLink(lambda: self.on_exit(None)))
     workflow.start()
