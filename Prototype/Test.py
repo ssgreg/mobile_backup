@@ -854,7 +854,7 @@ def command_test(args, io_service):
 
 
 def Main():
-  print("Acronis Mobile Backup prototype for Apple devices 1.0")
+  print("Acronis Mobile Backup")
   configure_logger()
   logger().info('Current platform: {0}'.format(sys.platform))
 
