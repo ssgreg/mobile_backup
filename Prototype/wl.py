@@ -35,10 +35,6 @@ class WorkflowLink:
   def block(self):
     pass
 
-  def if_not_blocked(self, fn):
-    if self.blocked():
-      fn()
-
   def proceed(self):
     self.next()
 

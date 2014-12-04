@@ -676,27 +676,14 @@ class LockdownStartServiceWLink(wl.WorkflowLink):
 class LockdownService:
   LOCKDOWN_SERVICE_PORT = 62078
 
-  def __init__(self, io_service, did, sn):
+  def __init__(self, io_service):
     self.io_service = io_service
-    self.did = did
-    self.sn = sn
     self.connection = None
-    self.data = dict(io_service=self.io_service, did=self.did, sn=self.sn)
+    self.data = dict(io_service=self.io_service)
 
-  def __enter__(self):
-    return self
-
-  def __exit__(self, exc_type, exc_value, traceback):
-    self.close()
-
-  def start_another_service(self, name, on_result):
-    self.__start_another_service(name, False, on_result)
-
-  def start_another_service_with_escrow_bag(self, name, on_result):
-    self.__start_another_service(name, True, on_result)
-
-  def __start_another_service(self, name, use_escrow_bag, on_result):
-    logger().debug('Starting service ''{0}'' with did = {1} and sn = {2}'.format(name, self.did, self.sn))
+  def connect(self, did, sn, on_result):
+    logger().debug('Connecting to lockdown with did = {0} and sn = {1}'.format(did, sn))
+    self.data.update(did=did, sn=sn)
     #
     workflow = wl.WorkflowBatch(
       ConnectToUsbMuxdWLink(self.data),
@@ -706,10 +693,20 @@ class LockdownService:
       LockdownServiceCheckTypeWLink(self.data),
       LockdownValidatePairRecordWLink(self.data),
       LockdownStartSessionWLink(self.data),
+      wl.ProxyWorkflowLink(on_result))
+    workflow.start()
+
+  def start_another_service(self, name, on_result):
+    self.__start_another_service(name, False, on_result)
+
+  def start_another_service_with_escrow_bag(self, name, on_result):
+    self.__start_another_service(name, True, on_result)
+
+  def __start_another_service(self, name, use_escrow_bag, on_result):
+    workflow = wl.WorkflowBatch(
       LockdownStartServiceWLink(self.data, service_name=name, use_escrow_bag=use_escrow_bag),
       wl.ProxyWorkflowLink(lambda: self.__call_on_result_for_start_another_service(on_result, self.data)))
     workflow.start()
-
 
   def __call_on_result_for_start_another_service(self, on_result, data):
     if 'port' in data:
@@ -723,6 +720,16 @@ class LockdownService:
       logger().debug('Closing internal connection...')
       self.data['connection'].close()
       self.data['connection'] = None
+
+
+#
+# ConnectToLockdownWLink
+#
+
+class ConnectToLockdownWLink(wl.WorkflowLink):
+  def proceed(self):
+    self.data['lockdown'].connect(self.data['did'], self.data['sn'], lambda: self.blocked() or self.next())
+    self.stop_next()
 
 
 #
@@ -792,7 +799,7 @@ class TestBackup:
     self.io_service = SafeIOService(io_service, self.on_exit)
     self.did = did
     self.sn = sn
-    self.lockdown = LockdownService(self.io_service, self.did, self.sn)
+    self.lockdown = LockdownService(self.io_service)
     self.notification_proxy = NotificationProxyService(self.io_service)
     self.data = dict(io_service=self.io_service, lockdown=self.lockdown, notification_proxy=self.notification_proxy, did=self.did, sn=self.sn)
  
@@ -804,6 +811,7 @@ class TestBackup:
 
   def on_enter(self):
     workflow = wl.WorkflowBatch(
+      ConnectToLockdownWLink(self.data, did=self.did, sn = self.sn),
       StartServiceViaLockdownWLink(self.data, service=self.NP_SERVICE_NAME, use_escrow_bag=True),
       ConnectToNotiticationProxyWLink(self.data),
       wl.ProxyWorkflowLink(lambda: self.on_exit(None)))
