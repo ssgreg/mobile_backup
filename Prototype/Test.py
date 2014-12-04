@@ -370,13 +370,45 @@ class LockdownSession:
     self.reset()
     callback(plist_data)
 
-
   def enable_ssl(self, cert, key):
     self.__connection.enable_ssl(cert, key)
 
   def reset(self):
     self.callback = None
     self.original_request = ''
+
+
+
+#
+# CommonServiceSession
+#
+
+class CommonServiceSession:
+  def __init__(self, connection):
+    self.__channel = PlistChannel(connection)
+    self.__channel.on_incoming_plist = self.__on_incoming_plist
+    self.on_notification = lambda plist_data: None
+    self.reset()
+    logger().debug('Common service session has started')
+
+  def send(self, plist_data, on_result):
+    self.callback = on_result
+    self.__channel.send(plist_data)
+
+  def __on_incoming_plist(self, plist_data):
+    callback = self.callback
+    self.reset()
+    if callback:
+      callback(plist_data)
+    else:
+      self.on_notification(plist_data)
+
+  def enable_ssl(self, cert, key):
+    self.__connection.enable_ssl(cert, key)
+
+  def reset(self):
+    self.callback = None
+
 
 
 def connect():
@@ -602,6 +634,16 @@ class SessionChangeToUsbMuxWLink(wl.WorkflowLink):
 
 
 #
+# SessionChangeToCommonService
+#
+
+class SessionChangeToCommonService(wl.WorkflowLink):
+  def proceed(self):
+    self.data['session'] = CommonServiceSession(self.data['connection'])
+    self.next()
+
+
+#
 # LockdownServiceCheckTypeWLink
 #
 
@@ -817,6 +859,26 @@ class ConnectToNotiticationProxyWLink(wl.WorkflowLink):
     self.stop_next()
 
 
+class VersionExchangeWLink(wl.WorkflowLink):
+  VERSION_MAJOR = 300
+  VERSION_MINOR = 0
+
+  def proceed(self):
+    logger().debug('Waiting for version exchange. Expected version is: {0}.{1}'.format(self.VERSION_MAJOR, self.VERSION_MINOR))
+    self.data['session'].on_notification = lambda x: self.blocked() or self.on_version_exchange(x)
+    self.stop_next()
+
+  def on_version_exchange(self, query):
+    self.data['session'].on_notification = None
+    if 'DLMessageVersionExchange' in query and len(query) == 3:
+      if query[1] > self.VERSION_MAJOR or (query[1] > self.VERSION_MAJOR and query[2] > self.VERSION_MINOR):
+        raise RuntimeError('Version exchange failed. Device version is: {0}.{1}'.format(query[1], query[2]))
+      else:
+        logger().debug('Done. Device version is: {0}.{1}'.format(query[1], query[2]))
+        self.next()
+    else:
+      raise RuntimeError('Version exchange failed.')
+
 #
 # MobileBackup2Service
 #
@@ -831,7 +893,8 @@ class MobileBackup2Service:
       ConnectToUsbMuxdWLink(self.data),
       SessionChangeToUsbMuxWLink(self.data),
       ConnectToServiceWLink(self.data, did=did, service_port=port),
-
+      SessionChangeToCommonService(self.data),
+      VersionExchangeWLink(self.data),
       wl.ProxyWorkflowLink(on_result))
     workflow.start()
 
@@ -893,7 +956,7 @@ class TestBackup:
     workflow.start()
 
   def on_exit(self, e):
-    print('on_exit')
+    logger().debug('Exit')
     if e:
       import traceback
       logger().error(traceback.format_exc())
