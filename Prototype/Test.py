@@ -478,7 +478,7 @@ def create_lockdown_message_start_service(service, escrow_bag=None):
     result['EscrowBag'] = escrow_bag
   return result
 
-def create_service_message_dl_version_ok(major, minor):
+def create_device_link_message_dl_version_ok(major, minor):
   return [
     'DLMessageVersionExchange',
     'DLVersionsOk',
@@ -883,11 +883,13 @@ class DeviceLinkVersionExchangeWLink(wl.WorkflowLink):
   def on_handshake(self, query):
     self.data['session'].on_notification = None
     if 'DLMessageVersionExchange' in query and len(query) == 3:
-      if query[1] > self.VERSION_MAJOR or (query[1] > self.VERSION_MAJOR and query[2] > self.VERSION_MINOR):
-        raise RuntimeError('Version exchange failed. Device version is: {0}.{1}'.format(query[1], query[2]))
+      major = query[1]
+      minor = query[2]
+      if major > self.VERSION_MAJOR or (major > self.VERSION_MAJOR and minor > self.VERSION_MINOR):
+        raise RuntimeError('Version exchange failed. Device version is: {0}.{1}'.format(major, minor))
       else:
-        logger().debug('Device version is: {0}.{1}'.format(query[1], query[2]))
-        self.data['session'].send(create_service_message_dl_version_ok(query[1], query[2]), lambda x: self.blocked() or self.on_version_exchange(x))
+        logger().debug('Device version is: {0}.{1}'.format(major, minor))
+        self.data['session'].send(create_device_link_message_dl_version_ok(major, minor), lambda x: self.blocked() or self.on_version_exchange(x))
     else:
       raise RuntimeError('Version exchange failed.')
 
