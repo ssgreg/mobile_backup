@@ -485,6 +485,18 @@ def create_device_link_message_dl_version_ok(major, minor):
     major
   ]
 
+def create_device_link_message_process_message(message):
+  return [
+    'DLMessageProcessMessage',
+    message
+  ]
+
+def create_mobilebackup2_message_hello(versions):
+  return dict(
+    SupportedProtocolVersions=versions,
+    MessageName='Hello'
+  )
+
 def print_device_info(device):
   print('\t'
     , 'did:', device['DeviceID']
@@ -800,10 +812,10 @@ class LockdownService:
 
 
 #
-# ConnectToLockdownWLink
+# UxbMuxConnectToLockdownWLink
 #
 
-class ConnectToLockdownWLink(wl.WorkflowLink):
+class UxbMuxConnectToLockdownWLink(wl.WorkflowLink):
   def proceed(self):
     self.data['lockdown'].connect(self.data['did'], self.data['sn'], lambda: self.blocked() or self.next())
     self.stop_next()
@@ -813,7 +825,7 @@ class ConnectToLockdownWLink(wl.WorkflowLink):
 # StartServiceViaLockdown
 #
 
-class StartServiceViaLockdownWLink(wl.WorkflowLink):
+class LockdownStartAnotherServiceWLink(wl.WorkflowLink):
   def proceed(self):
     if self.data['use_escrow_bag']:
       fn = self.data['lockdown'].start_another_service_with_escrow_bag
@@ -858,10 +870,10 @@ class NotificationProxyService:
 
 
 #
-# ConnectToNotiticationProxyWLink
+# NotificationProxyConnectWLink
 #
 
-class ConnectToNotiticationProxyWLink(wl.WorkflowLink):
+class NotificationProxyConnectWLink(wl.WorkflowLink):
   def proceed(self):
     self.data['notification_proxy'].connect(self.data['did'], self.data['service_port'], lambda: self.blocked() or self.next())
     self.stop_next()
@@ -890,6 +902,7 @@ class DeviceLinkVersionExchangeWLink(wl.WorkflowLink):
       else:
         logger().debug('Device version is: {0}.{1}'.format(major, minor))
         self.data['session'].send(create_device_link_message_dl_version_ok(major, minor), lambda x: self.blocked() or self.on_version_exchange(x))
+        self.stop_next()
     else:
       raise RuntimeError('Version exchange failed.')
 
@@ -902,26 +915,46 @@ class DeviceLinkVersionExchangeWLink(wl.WorkflowLink):
 
 
 #
-# MobileBackup2Service
+# DeviceLinkInternalProcessMessageWLink
 #
 
-class MobileBackup2Service:
-  SERVICE_NAME = 'com.apple.mobilebackup2'
+class DeviceLinkInternalProcessMessageWLink(wl.WorkflowLink):
+  def proceed(self):
+    logger().debug('DeviceLinkInternalProcessMessageWLink: Processing message...')
+    self.data['session'].send(create_device_link_message_process_message(self.data['message']), lambda x: self.blocked() or self.on_process_message(x))
+    self.stop_next()
 
+  def on_process_message(self, result):
+    if result[0] == 'DLMessageProcessMessage' and len(result) == 2:
+      logger().debug('DeviceLinkInternalProcessMessageWLink: Done')
+      self.data['process_result'] = result[1]
+      self.next()
+    else:
+      raise RuntimeError('DeviceLinkInternalProcessMessageWLink: Incorrect reply')
+
+
+#
+# DeviceLinkService
+#
+
+class DeviceLinkService:
   def __init__(self, io_service):
     self.io_service = io_service
-    self.data = dict(io_service=self.io_service)
+    self.data = dict(io_service=self.io_service, device_link=self)
 
   def connect(self, did, port, on_result):
-    workflow = wl.WorkflowBatch(
+    self.workflow = wl.WorkflowBatch(
       ConnectToUsbMuxdWLink(self.data),
       SessionChangeToUsbMuxWLink(self.data),
       ConnectToServiceWLink(self.data, did=did, service_port=port),
       SessionChangeToCommonService(self.data),
       DeviceLinkVersionExchangeWLink(self.data),
       wl.ProxyWorkflowLink(on_result))
-    workflow.start()
+    self.workflow.start()
 
+  def process_message(self, message, on_result):
+    self.workflow = wl.WorkflowBatch(DeviceLinkInternalProcessMessageWLink(self.data, message=message), wl.ProxyWorkflowLink(on_result))
+    self.workflow.start()
 
   def close(self):
     if 'connection' in self.data:
@@ -930,12 +963,60 @@ class MobileBackup2Service:
 
 
 #
-# ConnectToMobileBackup2WLink
+# MobileBackup2InternalHelloWLink
 #
 
-class ConnectToMobileBackup2WLink(wl.WorkflowLink):
+class MobileBackup2InternalHelloWLink(wl.WorkflowLink):
+  def proceed(self):
+    versions = [2.0, 2.1]
+    logger().debug('MobileBackup2InternalHelloWLink: Sending Hello message. Supported protocol version are: {0}...'.format(versions))
+    self.data['device_link'].process_message(create_mobilebackup2_message_hello(versions), lambda: self.blocked() or self.on_hello())
+    self.stop_next()
+
+  def on_hello(self):
+    result = self.data['process_result']
+    if 'MessageName' in result and result['MessageName'] == 'Response':
+      logger().debug('MobileBackup2InternalHelloWLink: Hello reply. Protocol version is {0}...'.format(result['ProtocolVersion']))
+      if result['ErrorCode'] == 0:
+        self.next()
+      else:
+        raise RuntimeError('MobileBackup2InternalHelloWLink: No common version')
+    else:
+      raise RuntimeError('MobileBackup2InternalHelloWLink: Incorrect reply')
+
+
+#
+# MobileBackup2Service
+#
+
+class MobileBackup2Service(DeviceLinkService):
+  SERVICE_NAME = 'com.apple.mobilebackup2'
+
+  def __init__(self, io_service):
+    super().__init__(io_service)
+
+  def hello(self, on_result):
+    self.workflow = wl.WorkflowBatch(MobileBackup2InternalHelloWLink(self.data), wl.ProxyWorkflowLink(on_result))
+    self.workflow.start()
+
+
+#
+# MobileBackup2ConnectToWLink
+#
+
+class MobileBackup2ConnectToWLink(wl.WorkflowLink):
   def proceed(self):
     self.data['mobilebackup2'].connect(self.data['did'], self.data['service_port'], lambda: self.blocked() or self.next())
+    self.stop_next()
+
+
+#
+# MobileBackup2HelloWLink
+#
+
+class MobileBackup2HelloToWLink(wl.WorkflowLink):
+  def proceed(self):
+    self.data['mobilebackup2'].hello(lambda: self.blocked() or self.next())
     self.stop_next()
 
 
@@ -968,11 +1049,12 @@ class TestBackup:
 
   def on_enter(self):
     workflow = wl.WorkflowBatch(
-      ConnectToLockdownWLink(self.data, did=self.did, sn = self.sn),
-      StartServiceViaLockdownWLink(self.data, service=NotificationProxyService.SERVICE_NAME, use_escrow_bag=True),
-      ConnectToNotiticationProxyWLink(self.data),
-      StartServiceViaLockdownWLink(self.data, service=MobileBackup2Service.SERVICE_NAME, use_escrow_bag=True),
-      ConnectToMobileBackup2WLink(self.data),
+      UxbMuxConnectToLockdownWLink(self.data, did=self.did, sn = self.sn),
+      LockdownStartAnotherServiceWLink(self.data, service=NotificationProxyService.SERVICE_NAME, use_escrow_bag=True),
+      NotificationProxyConnectWLink(self.data),
+      LockdownStartAnotherServiceWLink(self.data, service=MobileBackup2Service.SERVICE_NAME, use_escrow_bag=True),
+      MobileBackup2ConnectToWLink(self.data),
+      MobileBackup2HelloToWLink(self.data),
       wl.ProxyWorkflowLink(lambda: self.on_exit(None)))
     workflow.start()
 
@@ -1031,3 +1113,22 @@ def Main():
   io_service.run()
 
 Main()
+
+
+# <?xml version="1.0" encoding="UTF-8"?>
+# <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+# <plist version="1.0">
+# <array>
+#   <string>DLMessageProcessMessage</string>
+#   <dict>
+#   <key>SupportedProtocolVersions</key>
+#   <array>
+#   <real>2.000000</real>
+#   <real>2.100000</real>
+#   </array>
+#   <key>MessageName</key>
+#   <string>Hello</string>
+#   </dict>
+# </array>
+# </plist>
+# 
