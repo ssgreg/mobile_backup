@@ -1014,7 +1014,7 @@ class MobileBackup2ConnectToWLink(wl.WorkflowLink):
 # MobileBackup2HelloWLink
 #
 
-class MobileBackup2HelloToWLink(wl.WorkflowLink):
+class MobileBackup2HelloWLink(wl.WorkflowLink):
   def proceed(self):
     self.data['mobilebackup2'].hello(lambda: self.blocked() or self.next())
     self.stop_next()
@@ -1054,7 +1054,7 @@ class TestBackup:
       NotificationProxyConnectWLink(self.data),
       LockdownStartAnotherServiceWLink(self.data, service=MobileBackup2Service.SERVICE_NAME, use_escrow_bag=True),
       MobileBackup2ConnectToWLink(self.data),
-      MobileBackup2HelloToWLink(self.data),
+      MobileBackup2HelloWLink(self.data),
       wl.ProxyWorkflowLink(lambda: self.on_exit(None)))
     workflow.start()
 
