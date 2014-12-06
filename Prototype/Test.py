@@ -1093,7 +1093,7 @@ class AppleFileConduitService(DeviceLinkService):
 
 class AppleFileConduitConnectWLink(wl.WorkflowLink):
   def proceed(self):
-    self.data['afc'].connect(self.data.did, self.data.service_port, lambda: self.blocked() or self.next())
+    self.data.afc.connect(self.data.did, self.data.service_port, lambda: self.blocked() or self.next())
     self.stop_next()
 
 
@@ -1129,8 +1129,8 @@ class TestBackup:
       UxbMuxConnectToLockdownWLink(self.data, did=self.did, sn = self.sn),
       # LockdownStartAnotherServiceWLink(self.data, service=AppleFileConduitService.SERVICE_NAME, use_escrow_bag=False),
       # AppleFileConduitConnectWLink(self.data),
-      # LockdownStartAnotherServiceWLink(self.data, service=NotificationProxyService.SERVICE_NAME, use_escrow_bag=False),
-      # NotificationProxyConnectWLink(self.data),
+      LockdownStartAnotherServiceWLink(self.data, service=NotificationProxyService.SERVICE_NAME, use_escrow_bag=False),
+      NotificationProxyConnectWLink(self.data),
       LockdownStartAnotherServiceWLink(self.data, service=MobileBackup2Service.SERVICE_NAME, use_escrow_bag=True),
       MobileBackup2ConnectToWLink(self.data),
       MobileBackup2HelloWLink(self.data),
