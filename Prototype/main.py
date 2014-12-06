@@ -16,7 +16,9 @@ import sys
 from io_service import *
 from logger import *
 from tools import *
+import device_link
 import lockdown
+import mobilebackup2
 import usbmux
 import wl
 
@@ -63,25 +65,6 @@ def connect():
     sock = socket.socket()
     sock.connect(('127.0.0.1', 27015))
   return sock
-
-def create_device_link_message_dl_version_ok(major, minor):
-  return [
-    'DLMessageVersionExchange',
-    'DLVersionsOk',
-    major
-  ]
-
-def create_device_link_message_process_message(message):
-  return [
-    'DLMessageProcessMessage',
-    message
-  ]
-
-def create_mobilebackup2_message_hello(versions):
-  return dict(
-    SupportedProtocolVersions=versions,
-    MessageName='Hello'
-  )
 
 def print_device_info(device):
   print('\t'
@@ -507,7 +490,7 @@ class DeviceLinkVersionExchangeWLink(wl.WorkflowLink):
         raise RuntimeError('Version exchange failed. Device version is: {0}.{1}'.format(major, minor))
       else:
         logger().debug('Device version is: {0}.{1}'.format(major, minor))
-        self.data.session.send(create_device_link_message_dl_version_ok(major, minor), lambda x: self.blocked() or self.on_version_exchange(x))
+        self.data.session.send(device_link.create_device_link_message_dl_version_ok(major, minor), lambda x: self.blocked() or self.on_version_exchange(x))
         self.stop_next()
     else:
       raise RuntimeError('Version exchange failed.')
@@ -526,8 +509,8 @@ class DeviceLinkVersionExchangeWLink(wl.WorkflowLink):
 
 class DeviceLinkInternalProcessMessageWLink(wl.WorkflowLink):
   def proceed(self):
-    logger().debug('DeviceLinkInternalProcessMessageWLink: Processing message...')
-    self.data.session.send(create_device_link_message_process_message(self.data.message), lambda x: self.blocked() or self.on_process_message(x))
+    logger().debug('DeviceLinkIntern565alProcessMessageWLink: Processing message...')
+    self.data.session.send(device_link.create_device_link_message_process_message(self.data.message), lambda x: self.blocked() or self.on_process_message(x))
     self.stop_next()
 
   def on_process_message(self, result):
@@ -579,7 +562,7 @@ class MobileBackup2InternalHelloWLink(wl.WorkflowLink):
   def proceed(self):
     versions = [2.0, 2.1]
     logger().debug('MobileBackup2InternalHelloWLink: Sending Hello message. Supported protocol version are: {0}...'.format(versions))
-    self.data.device_link.process_message(create_mobilebackup2_message_hello(versions), lambda: self.blocked() or self.on_hello())
+    self.data.device_link.process_message(mobilebackup2.create_mobilebackup2_message_hello(versions), lambda: self.blocked() or self.on_hello())
     self.stop_next()
 
   def on_hello(self):
