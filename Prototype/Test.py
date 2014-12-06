@@ -767,10 +767,10 @@ class LockdownStartServiceWLink(wl.WorkflowLink):
 
 
 #
-# LockdownInternalFixArguments
+# LockdownInternalFixIds
 #
 
-class LockdownInternalFixArguments(wl.WorkflowLink):
+class LockdownInternalFixIds(wl.WorkflowLink):
   def proceed(self):
     # sn only
     if self.data['sn'] and not self.data['did']:
@@ -792,6 +792,17 @@ class LockdownInternalFixArguments(wl.WorkflowLink):
 
 
 #
+# LockdownInternalSaveIds
+#
+
+class LockdownInternalSaveIds(wl.WorkflowLink):
+  def proceed(self):
+    self.data['lockdown'].did = self.data['did']
+    self.data['lockdown'].sn = self.data['sn']
+    self.next()
+
+
+#
 # LockdownService
 #
 
@@ -801,7 +812,9 @@ class LockdownService:
   def __init__(self, io_service):
     self.io_service = io_service
     self.connection = None
-    self.data = dict(io_service=self.io_service)
+    self.data = dict(io_service=self.io_service, lockdown=self)
+    self.did = None
+    self.sn = None
 
   def connect(self, did, sn, on_result):
     logger().debug('Connecting to lockdown with did = {0} and sn = {1}'.format(did, sn))
@@ -811,7 +824,7 @@ class LockdownService:
       ConnectToUsbMuxdWLink(self.data),
       SessionChangeToUsbMuxWLink(self.data),
       ListDevicesWLink(self.data),
-      LockdownInternalFixArguments(self.data),
+      LockdownInternalFixIds(self.data),
       ReadBuidWLink(self.data),
       ReadPairRecordWLink(self.data),
       ConnectToServiceWLink(self.data, service_port=self.LOCKDOWN_SERVICE_PORT),
@@ -819,6 +832,7 @@ class LockdownService:
       LockdownServiceCheckTypeWLink(self.data),
       LockdownValidatePairRecordWLink(self.data),
       LockdownStartSessionWLink(self.data),
+      LockdownInternalSaveIds(self.data),
       wl.ProxyWorkflowLink(on_result))
     workflow.start()
 
@@ -854,8 +868,13 @@ class LockdownService:
 
 class UxbMuxConnectToLockdownWLink(wl.WorkflowLink):
   def proceed(self):
-    self.data['lockdown'].connect(self.data['did'], self.data['sn'], lambda: self.blocked() or self.next())
+    self.data['lockdown'].connect(self.data['did'], self.data['sn'], lambda: self.blocked() or self.on_connect_to_lockdown())
     self.stop_next()
+
+  def on_connect_to_lockdown(self):
+    self.data['did'] = self.data['lockdown'].did
+    self.data['sn'] = self.data['lockdown'].sn
+    self.next()
 
 
 #
@@ -1094,8 +1113,6 @@ class TestBackup:
     self.afc = AppleFileConduitService(self.io_service)
     self.data = dict(
       io_service=self.io_service,
-      did=self.did,
-      sn=self.sn,
       lockdown=self.lockdown,
       notification_proxy=self.notification_proxy,
       mobilebackup2=self.mobilebackup2,
@@ -1113,8 +1130,8 @@ class TestBackup:
       UxbMuxConnectToLockdownWLink(self.data, did=self.did, sn = self.sn),
       # LockdownStartAnotherServiceWLink(self.data, service=AppleFileConduitService.SERVICE_NAME, use_escrow_bag=False),
       # AppleFileConduitConnectWLink(self.data),
-      # LockdownStartAnotherServiceWLink(self.data, service=NotificationProxyService.SERVICE_NAME, use_escrow_bag=False),
-      # NotificationProxyConnectWLink(self.data),
+      LockdownStartAnotherServiceWLink(self.data, service=NotificationProxyService.SERVICE_NAME, use_escrow_bag=False),
+      NotificationProxyConnectWLink(self.data),
       # LockdownStartAnotherServiceWLink(self.data, service=MobileBackup2Service.SERVICE_NAME, use_escrow_bag=True),
       # MobileBackup2ConnectToWLink(self.data),
       # MobileBackup2HelloWLink(self.data),
