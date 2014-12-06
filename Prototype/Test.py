@@ -9,20 +9,12 @@ import collections
 import os
 import sys
 import ssl
-import logging
-import logging.config
 import tempfile
 import argparse
 #
+from logger import *
 import wl
 import usbmux
-
-
-def configure_logger():
-  logging.config.fileConfig('logging.ini')
-
-def logger():
-  return logging.getLogger(__name__)
 
 
 #
@@ -80,7 +72,6 @@ class SafeIOService:
 
   def register(self, io, rx):
     self.io_service.register(io, lambda: self.io_wrapper(rx))
-    # (lambda x: lambda: wrapper(x))(x)
 
   def unregister(self, io):
     self.io_service.unregister(io)
@@ -111,12 +102,10 @@ class Connection:
     self.__io.close()
 
   def send(self, data):
-#    print('CON[{}] <-- ({}) {}'.format(id(self.__io), len(data), binascii.hexlify(data)))
     self.__io.send(data)
 
   def recv(self, size):
     data = self.__io.recv(size)
-#    print('CON[{}] --> ({}) {}'.format(id(self.__io), len(data), binascii.hexlify(data)))
     if not data:
       raise RuntimeError('Connection forcibly closed.')
     return data
