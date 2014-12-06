@@ -576,6 +576,25 @@ class ConnectToUsbMuxdWLink(wl.WorkflowLink):
 
 
 #
+# ListDevicesWLink
+#
+
+class ListDevicesWLink(wl.WorkflowLink):
+  def proceed(self):
+    logger().debug('ListDevicesWLink: Getting device list...')
+    self.data['session'].send(create_usbmux_message_list_devices(), lambda x: self.blocked() or self.on_list_devices(x))
+    self.stop_next()
+
+  def on_list_devices(self, result):
+    if 'DeviceList' in result:
+      self.data['devices'] = result['DeviceList']
+      logger().debug('ListDevicesWLink: Done. Count = {0}'.format(len(self.data['devices'])))
+      self.next();
+    else:
+      raise RuntimeError('Failed to list devices')
+
+
+#
 # ReadBuidWLink
 #
 
@@ -748,12 +767,25 @@ class LockdownStartServiceWLink(wl.WorkflowLink):
 
 
 #
-# ServiceVersionExchange
+# LockdownInternalFixArguments
 #
 
-class ServiceVersionExchange(wl.WorkflowLink):
+class LockdownInternalFixArguments(wl.WorkflowLink):
   def proceed(self):
-    pass
+    if self.data['sn'] and not self.data['did']:
+      for device in self.data['devices']:
+        if device['Properties']['SerialNumber'] == self.data['sn'] and device['Properties']['ConnectionType'] == 'USB':
+          self.data['did'] = device['DeviceID']
+          break
+    elif self.data['did'] and not self.data['sn']:
+      for device in self.data['devices']:
+        if device['DeviceID'] == self.data['did'] and device['Properties']['ConnectionType'] == 'USB':
+          self.data['sn'] = device['Properties']['SerialNumber']
+          break
+    if self.data['sn'] and self.data['did']:
+      self.next()
+    else:
+      raise RuntimeError('There is no device with sn={0} and did={1}'.format(self.data['sn'], self.data['did']))
 
 
 #
@@ -775,6 +807,8 @@ class LockdownService:
     workflow = wl.WorkflowBatch(
       ConnectToUsbMuxdWLink(self.data),
       SessionChangeToUsbMuxWLink(self.data),
+      ListDevicesWLink(self.data),
+      LockdownInternalFixArguments(self.data),
       ReadBuidWLink(self.data),
       ReadPairRecordWLink(self.data),
       ConnectToServiceWLink(self.data, service_port=self.LOCKDOWN_SERVICE_PORT),
@@ -976,7 +1010,7 @@ class MobileBackup2InternalHelloWLink(wl.WorkflowLink):
   def on_hello(self):
     result = self.data['process_result']
     if 'MessageName' in result and result['MessageName'] == 'Response':
-      logger().debug('MobileBackup2InternalHelloWLink: Hello reply. Protocol version is {0}...'.format(result['ProtocolVersion']))
+      logger().debug('MobileBackup2InternalHelloWLink: Hello reply. Protocol version is {0}'.format(result['ProtocolVersion']))
       if result['ErrorCode'] == 0:
         self.next()
       else:
@@ -1021,6 +1055,28 @@ class MobileBackup2HelloWLink(wl.WorkflowLink):
 
 
 #
+# AppleFileConduitService
+#
+
+class AppleFileConduitService(DeviceLinkService):
+  SERVICE_NAME = 'com.apple.afc'
+
+  def __init__(self, io_service):
+    super().__init__(io_service)
+
+
+
+#
+# AppleFileConduitConnectWLink
+#
+
+class AppleFileConduitConnectWLink(wl.WorkflowLink):
+  def proceed(self):
+    self.data['afc'].connect(self.data['did'], self.data['service_port'], lambda: self.blocked() or self.next())
+    self.stop_next()
+
+
+#
 # TestBackup
 #
 
@@ -1032,13 +1088,15 @@ class TestBackup:
     self.lockdown = LockdownService(self.io_service)
     self.notification_proxy = NotificationProxyService(self.io_service)
     self.mobilebackup2 = MobileBackup2Service(self.io_service)
+    self.afc = AppleFileConduitService(self.io_service)
     self.data = dict(
       io_service=self.io_service,
       did=self.did,
       sn=self.sn,
       lockdown=self.lockdown,
       notification_proxy=self.notification_proxy,
-      mobilebackup2=self.mobilebackup2
+      mobilebackup2=self.mobilebackup2,
+      afc=self.afc
     )
  
   def start(self):
@@ -1050,11 +1108,13 @@ class TestBackup:
   def on_enter(self):
     workflow = wl.WorkflowBatch(
       UxbMuxConnectToLockdownWLink(self.data, did=self.did, sn = self.sn),
-      LockdownStartAnotherServiceWLink(self.data, service=NotificationProxyService.SERVICE_NAME, use_escrow_bag=True),
-      NotificationProxyConnectWLink(self.data),
-      LockdownStartAnotherServiceWLink(self.data, service=MobileBackup2Service.SERVICE_NAME, use_escrow_bag=True),
-      MobileBackup2ConnectToWLink(self.data),
-      MobileBackup2HelloWLink(self.data),
+      # LockdownStartAnotherServiceWLink(self.data, service=AppleFileConduitService.SERVICE_NAME, use_escrow_bag=False),
+      # AppleFileConduitConnectWLink(self.data),
+      # LockdownStartAnotherServiceWLink(self.data, service=NotificationProxyService.SERVICE_NAME, use_escrow_bag=False),
+      # NotificationProxyConnectWLink(self.data),
+      # LockdownStartAnotherServiceWLink(self.data, service=MobileBackup2Service.SERVICE_NAME, use_escrow_bag=True),
+      # MobileBackup2ConnectToWLink(self.data),
+      # MobileBackup2HelloWLink(self.data),
       wl.ProxyWorkflowLink(lambda: self.on_exit(None)))
     workflow.start()
 
