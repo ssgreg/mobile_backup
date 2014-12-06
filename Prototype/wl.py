@@ -1,5 +1,27 @@
 #
 
+
+#
+# WorkflowLinkData
+#
+
+class WorkflowLinkData:
+  def __init__(self, data, private_data):
+    self.__dict__['__data'] = data
+    self.__dict__['__private_data'] = private_data
+
+  def __setattr__(self, name, value):
+    self.__dict__['__data'][name] = value
+
+  def __getattr__(self, name):
+    if name in self.__dict__['__data']:
+      return self.__dict__['__data'][name]
+    elif name in self.__dict__['__private_data']:
+      return self.__dict__['__private_data'][name]
+    else:
+      raise RuntimeError('Data: Key not found')
+
+
 #
 # WorkflowLink
 #
@@ -8,9 +30,7 @@ class WorkflowLink:
   def __init__(self, data=None, **kwargs):
     self.__next = None
     self.__blocked = True
-    self.data = data or {}
-    if kwargs:
-      self.data.update(kwargs)
+    self.data = WorkflowLinkData(data, kwargs)
 
   def link(self, next):
     self.__next = next
@@ -95,6 +115,15 @@ class WorkflowBatch(WorkflowLink):
     self.stop_next()
 
 
+
+# d1 = dict()
+# d2 = dict(a=1)
+
+# d = WorkflowLinkData(d1, d2)
+# d.b = 'Test'
+# print(d.b)
+
+# print(d1)
 
 # class TestWL(WorkflowLink):
 #   def proceed(self):

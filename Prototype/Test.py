@@ -571,7 +571,7 @@ class TestListenForDevices:
 
 class ConnectToUsbMuxdWLink(wl.WorkflowLink):
   def proceed(self):
-    self.data['connection'] = Connection(self.data['io_service'], connect())
+    self.data.connection = Connection(self.data.io_service, connect())
     self.next()
 
 
@@ -582,13 +582,13 @@ class ConnectToUsbMuxdWLink(wl.WorkflowLink):
 class ListDevicesWLink(wl.WorkflowLink):
   def proceed(self):
     logger().debug('ListDevicesWLink: Getting device list...')
-    self.data['session'].send(create_usbmux_message_list_devices(), lambda x: self.blocked() or self.on_list_devices(x))
+    self.data.session.send(create_usbmux_message_list_devices(), lambda x: self.blocked() or self.on_list_devices(x))
     self.stop_next()
 
   def on_list_devices(self, result):
     if 'DeviceList' in result:
-      self.data['devices'] = result['DeviceList']
-      logger().debug('ListDevicesWLink: Done. Count = {0}'.format(len(self.data['devices'])))
+      self.data.devices = result['DeviceList']
+      logger().debug('ListDevicesWLink: Done. Count = {0}'.format(len(self.data.devices)))
       self.next();
     else:
       raise RuntimeError('Failed to list devices')
@@ -601,13 +601,13 @@ class ListDevicesWLink(wl.WorkflowLink):
 class ReadBuidWLink(wl.WorkflowLink):
   def proceed(self):
     logger().debug('Reading BUID')
-    self.data['session'].send(create_usbmux_message_read_buid(), lambda x: self.blocked() or self.on_read_buid(x))
+    self.data.session.send(create_usbmux_message_read_buid(), lambda x: self.blocked() or self.on_read_buid(x))
     self.stop_next()
 
   def on_read_buid(self, result):
     if 'BUID' in result:
-      self.data['BUID'] = result['BUID']
-      logger().debug('Done. BUID = {0}'.format(self.data['BUID']))
+      self.data.buid = result['BUID']
+      logger().debug('Done. BUID = {0}'.format(self.data.buid))
       self.next();
     else:
       raise RuntimeError('Failed to read BUID')
@@ -619,14 +619,14 @@ class ReadBuidWLink(wl.WorkflowLink):
 
 class ReadPairRecordWLink(wl.WorkflowLink):
   def proceed(self):
-    logger().debug('Reading pair record of a device with a sn = {0}'.format(self.data['sn']))
-    self.data['session'].send(create_usbmux_message_read_pair_record(self.data['sn']), lambda x: self.blocked() or self.on_get_pair_record(x))
+    logger().debug('Reading pair record of a device with a sn = {0}'.format(self.data.sn))
+    self.data.session.send(create_usbmux_message_read_pair_record(self.data.sn), lambda x: self.blocked() or self.on_get_pair_record(x))
     self.stop_next()
 
   def on_get_pair_record(self, result):
     if 'PairRecordData' in result:
-      self.data['pair_record_data'] = plistlib.loads(result['PairRecordData'])
-      logger().debug('Done. HostID = {0}'.format(self.data['pair_record_data']['HostID']))
+      self.data.pair_record_data = plistlib.loads(result['PairRecordData'])
+      logger().debug('Done. HostID = {0}'.format(self.data.pair_record_data['HostID']))
       self.next();
     else:
       raise RuntimeError('Failed to read pair record')
@@ -638,8 +638,8 @@ class ReadPairRecordWLink(wl.WorkflowLink):
 
 class ConnectToServiceWLink(wl.WorkflowLink):
   def proceed(self):
-    logger().debug('Connecting to a service, did = {0} port = {1}'.format(self.data['did'], self.data['service_port']))
-    self.data['session'].send(create_usbmux_message_connect(self.data['did'], self.data['service_port']), lambda x: self.blocked() or self.on_connect(x))
+    logger().debug('Connecting to a service, did = {0} port = {1}'.format(self.data.did, self.data.service_port))
+    self.data.session.send(create_usbmux_message_connect(self.data.did, self.data.service_port), lambda x: self.blocked() or self.on_connect(x))
     self.stop_next()
 
   def on_connect(self, confirmation):
@@ -656,7 +656,7 @@ class ConnectToServiceWLink(wl.WorkflowLink):
 
 class SessionChangeToLockdown(wl.WorkflowLink):
   def proceed(self):
-    self.data['session'] = LockdownSession(self.data['connection'])
+    self.data.session = LockdownSession(self.data.connection)
     self.next()
 
 
@@ -666,7 +666,7 @@ class SessionChangeToLockdown(wl.WorkflowLink):
 
 class SessionChangeToUsbMuxWLink(wl.WorkflowLink):
   def proceed(self):
-    self.data['session'] = UsbMuxSession(self.data['connection'])
+    self.data.session = UsbMuxSession(self.data.connection)
     self.next()
 
 
@@ -676,7 +676,7 @@ class SessionChangeToUsbMuxWLink(wl.WorkflowLink):
 
 class SessionChangeToCommonService(wl.WorkflowLink):
   def proceed(self):
-    self.data['session'] = CommonServiceSession(self.data['connection'])
+    self.data.session = CommonServiceSession(self.data.connection)
     self.next()
 
 
@@ -689,7 +689,7 @@ class LockdownServiceCheckTypeWLink(wl.WorkflowLink):
 
   def proceed(self):
     logger().debug('Checking lockdown service type...')
-    self.data['session'].send(create_lockdown_message_query_type(), lambda x: self.blocked() or self.on_check_lockdown_type(x))
+    self.data.session.send(create_lockdown_message_query_type(), lambda x: self.blocked() or self.on_check_lockdown_type(x))
     self.stop_next()
 
   def on_check_lockdown_type(self, result):
@@ -706,8 +706,8 @@ class LockdownServiceCheckTypeWLink(wl.WorkflowLink):
 
 class LockdownValidatePairRecordWLink(wl.WorkflowLink):
   def proceed(self):
-    logger().debug('Validating pair record with HostID = {0}'.format(self.data['pair_record_data']['HostID']))
-    self.data['session'].send(create_lockdown_message_validate_pair(self.data['pair_record_data']['HostID']), lambda x: self.blocked() or self.on_validate_pair_record(x))
+    logger().debug('Validating pair record with HostID = {0}'.format(self.data.pair_record_data['HostID']))
+    self.data.session.send(create_lockdown_message_validate_pair(self.data.pair_record_data['HostID']), lambda x: self.blocked() or self.on_validate_pair_record(x))
     self.stop_next()
 
   def on_validate_pair_record(self, result):
@@ -724,11 +724,11 @@ class LockdownValidatePairRecordWLink(wl.WorkflowLink):
 
 class LockdownStartSessionWLink(wl.WorkflowLink):
   def proceed(self):
-    hostID = self.data['pair_record_data']['HostID']
-    buid = self.data['BUID']
+    hostID = self.data.pair_record_data['HostID']
+    buid = self.data.buid
     #
     logger().debug('Starting lockdown session with HostID = {0} and BUID = {1}'.format(hostID, buid))
-    self.data['session'].send(create_lockdown_message_start_session(hostID, buid), lambda x: self.blocked() or self.on_start_session(x))
+    self.data.session.send(create_lockdown_message_start_session(hostID, buid), lambda x: self.blocked() or self.on_start_session(x))
     self.stop_next()
 
   def on_start_session(self, result):
@@ -737,7 +737,7 @@ class LockdownStartSessionWLink(wl.WorkflowLink):
       use_ssl = result['EnableSessionSSL']
       logger().debug('Done. SessionID = {0}, UseSSL = {1}'.format(session_id, use_ssl))
       if use_ssl:
-        self.data['session'].enable_ssl(self.data['pair_record_data']['HostCertificate'], self.data['pair_record_data']['HostPrivateKey'])
+        self.data.session.enable_ssl(self.data.pair_record_data['HostCertificate'], self.data.pair_record_data['HostPrivateKey'])
       self.next();
     else:
       raise RuntimeError('Failed to start session. Error: {0}'.format(result['Error']))
@@ -749,15 +749,15 @@ class LockdownStartSessionWLink(wl.WorkflowLink):
 
 class LockdownStartServiceWLink(wl.WorkflowLink):
   def proceed(self):
-    logger().debug('Starting {0} via Lockdown {1} escrow bag'.format(self.data['service_name'], "with" if self.data['use_escrow_bag'] else "without"))
-    escrow_bag = self.data['pair_record_data']['EscrowBag'] if self.data['use_escrow_bag'] else None
-    self.data['session'].send(create_lockdown_message_start_service(self.data['service_name'], escrow_bag), lambda x: self.blocked() or self.on_start_service(x))
+    logger().debug('Starting {0} via Lockdown {1} escrow bag'.format(self.data.service_name, "with" if self.data.use_escrow_bag else "without"))
+    escrow_bag = self.data.pair_record_data['EscrowBag'] if self.data.use_escrow_bag else None
+    self.data.session.send(create_lockdown_message_start_service(self.data.service_name, escrow_bag), lambda x: self.blocked() or self.on_start_service(x))
     self.stop_next()
 
   def on_start_service(self, result):
     if 'Error' not in result:
       logger().debug('Done. Port = {0}'.format(result['Port']))
-      self.data['port'] = result['Port']
+      self.data.port = result['Port']
       self.next();
     else:
       if result['Error'] == 'EscrowLocked':
@@ -773,22 +773,22 @@ class LockdownStartServiceWLink(wl.WorkflowLink):
 class LockdownInternalFixIds(wl.WorkflowLink):
   def proceed(self):
     # sn only
-    if self.data['sn'] and not self.data['did']:
-      for device in self.data['devices']:
-        if device['Properties']['SerialNumber'] == self.data['sn'] and device['Properties']['ConnectionType'] == 'USB':
-          self.data['did'] = device['DeviceID']
+    if self.data.sn and not self.data.did:
+      for device in self.data.devices:
+        if device['Properties']['SerialNumber'] == self.data.sn and device['Properties']['ConnectionType'] == 'USB':
+          self.data.did = device['DeviceID']
           break
     # did only
-    elif self.data['did'] and not self.data['sn']:
-      for device in self.data['devices']:
-        if device['DeviceID'] == self.data['did'] and device['Properties']['ConnectionType'] == 'USB':
-          self.data['sn'] = device['Properties']['SerialNumber']
+    elif self.data.did and not self.data.sn:
+      for device in self.data.devices:
+        if device['DeviceID'] == self.data.did and device['Properties']['ConnectionType'] == 'USB':
+          self.data.sn = device['Properties']['SerialNumber']
           break
     # both
-    if self.data['sn'] and self.data['did']:
+    if self.data.sn and self.data.did:
       self.next()
     else:
-      raise RuntimeError('There is no device with sn={0} and did={1}'.format(self.data['sn'], self.data['did']))
+      raise RuntimeError('There is no device with sn={0} and did={1}'.format(self.data.sn, self.data.did))
 
 
 #
@@ -797,8 +797,8 @@ class LockdownInternalFixIds(wl.WorkflowLink):
 
 class LockdownInternalSaveIds(wl.WorkflowLink):
   def proceed(self):
-    self.data['lockdown'].did = self.data['did']
-    self.data['lockdown'].sn = self.data['sn']
+    self.data.lockdown.did = self.data.did
+    self.data.lockdown.sn = self.data.sn
     self.next()
 
 
@@ -850,7 +850,6 @@ class LockdownService:
 
   def __call_on_result_for_start_another_service(self, on_result, data):
     if 'port' in data:
-      logger().debug('Service {0} has been started on port = {1}'.format(data['service_name'], data['port']))
       on_result(data['port'])
     else:
       on_result(None)
@@ -868,12 +867,12 @@ class LockdownService:
 
 class UxbMuxConnectToLockdownWLink(wl.WorkflowLink):
   def proceed(self):
-    self.data['lockdown'].connect(self.data['did'], self.data['sn'], lambda: self.blocked() or self.on_connect_to_lockdown())
+    self.data.lockdown.connect(self.data.did, self.data.sn, lambda: self.blocked() or self.on_connect_to_lockdown())
     self.stop_next()
 
   def on_connect_to_lockdown(self):
-    self.data['did'] = self.data['lockdown'].did
-    self.data['sn'] = self.data['lockdown'].sn
+    self.data.did = self.data.lockdown.did
+    self.data.sn = self.data.lockdown.sn
     self.next()
 
 
@@ -883,19 +882,19 @@ class UxbMuxConnectToLockdownWLink(wl.WorkflowLink):
 
 class LockdownStartAnotherServiceWLink(wl.WorkflowLink):
   def proceed(self):
-    if self.data['use_escrow_bag']:
-      fn = self.data['lockdown'].start_another_service_with_escrow_bag
+    if self.data.use_escrow_bag:
+      fn = self.data.lockdown.start_another_service_with_escrow_bag
     else:
-      fn = self.data['lockdown'].start_another_service
-    fn(self.data['service'], lambda x: self.blocked() or self.on_start(x))
+      fn = self.data.lockdown.start_another_service
+    fn(self.data.service, lambda x: self.blocked() or self.on_start(x))
     self.stop_next()
 
   def on_start(self, port):
     if port:
-      self.data['service_port'] = port
+      self.data.service_port = port
       self.next()
     else:
-      raise RuntimeError('Lockdown failed to start {0}'.format(self.data['service']))
+      raise RuntimeError('Lockdown failed to start {0}'.format(self.data.service))
 
 
 #
@@ -931,7 +930,7 @@ class NotificationProxyService:
 
 class NotificationProxyConnectWLink(wl.WorkflowLink):
   def proceed(self):
-    self.data['notification_proxy'].connect(self.data['did'], self.data['service_port'], lambda: self.blocked() or self.next())
+    self.data.notification_proxy.connect(self.data.did, self.data.service_port, lambda: self.blocked() or self.next())
     self.stop_next()
 
 
@@ -945,11 +944,11 @@ class DeviceLinkVersionExchangeWLink(wl.WorkflowLink):
 
   def proceed(self):
     logger().debug('Waiting for version exchange. Expected version is: {0}.{1}'.format(self.VERSION_MAJOR, self.VERSION_MINOR))
-    self.data['session'].on_notification = lambda x: self.blocked() or self.on_handshake(x)
+    self.data.session.on_notification = lambda x: self.blocked() or self.on_handshake(x)
     self.stop_next()
 
   def on_handshake(self, query):
-    self.data['session'].on_notification = None
+    self.data.session.on_notification = None
     if 'DLMessageVersionExchange' in query and len(query) == 3:
       major = query[1]
       minor = query[2]
@@ -957,7 +956,7 @@ class DeviceLinkVersionExchangeWLink(wl.WorkflowLink):
         raise RuntimeError('Version exchange failed. Device version is: {0}.{1}'.format(major, minor))
       else:
         logger().debug('Device version is: {0}.{1}'.format(major, minor))
-        self.data['session'].send(create_device_link_message_dl_version_ok(major, minor), lambda x: self.blocked() or self.on_version_exchange(x))
+        self.data.session.send(create_device_link_message_dl_version_ok(major, minor), lambda x: self.blocked() or self.on_version_exchange(x))
         self.stop_next()
     else:
       raise RuntimeError('Version exchange failed.')
@@ -977,13 +976,13 @@ class DeviceLinkVersionExchangeWLink(wl.WorkflowLink):
 class DeviceLinkInternalProcessMessageWLink(wl.WorkflowLink):
   def proceed(self):
     logger().debug('DeviceLinkInternalProcessMessageWLink: Processing message...')
-    self.data['session'].send(create_device_link_message_process_message(self.data['message']), lambda x: self.blocked() or self.on_process_message(x))
+    self.data.session.send(create_device_link_message_process_message(self.data.message), lambda x: self.blocked() or self.on_process_message(x))
     self.stop_next()
 
   def on_process_message(self, result):
     if result[0] == 'DLMessageProcessMessage' and len(result) == 2:
       logger().debug('DeviceLinkInternalProcessMessageWLink: Done')
-      self.data['process_result'] = result[1]
+      self.data.process_result = result[1]
       self.next()
     else:
       raise RuntimeError('DeviceLinkInternalProcessMessageWLink: Incorrect reply')
@@ -1014,7 +1013,7 @@ class DeviceLinkService:
 
   def close(self):
     if 'connection' in self.data:
-      logger().debug('Closing mobilebackup2 connection...')
+      logger().debug('Closing device link connection...')
       self.data['connection'].close()
 
 
@@ -1026,11 +1025,11 @@ class MobileBackup2InternalHelloWLink(wl.WorkflowLink):
   def proceed(self):
     versions = [2.0, 2.1]
     logger().debug('MobileBackup2InternalHelloWLink: Sending Hello message. Supported protocol version are: {0}...'.format(versions))
-    self.data['device_link'].process_message(create_mobilebackup2_message_hello(versions), lambda: self.blocked() or self.on_hello())
+    self.data.device_link.process_message(create_mobilebackup2_message_hello(versions), lambda: self.blocked() or self.on_hello())
     self.stop_next()
 
   def on_hello(self):
-    result = self.data['process_result']
+    result = self.data.process_result
     if 'MessageName' in result and result['MessageName'] == 'Response':
       logger().debug('MobileBackup2InternalHelloWLink: Hello reply. Protocol version is {0}'.format(result['ProtocolVersion']))
       if result['ErrorCode'] == 0:
@@ -1062,7 +1061,7 @@ class MobileBackup2Service(DeviceLinkService):
 
 class MobileBackup2ConnectToWLink(wl.WorkflowLink):
   def proceed(self):
-    self.data['mobilebackup2'].connect(self.data['did'], self.data['service_port'], lambda: self.blocked() or self.next())
+    self.data.mobilebackup2.connect(self.data.did, self.data.service_port, lambda: self.blocked() or self.next())
     self.stop_next()
 
 
@@ -1072,7 +1071,7 @@ class MobileBackup2ConnectToWLink(wl.WorkflowLink):
 
 class MobileBackup2HelloWLink(wl.WorkflowLink):
   def proceed(self):
-    self.data['mobilebackup2'].hello(lambda: self.blocked() or self.next())
+    self.data.mobilebackup2.hello(lambda: self.blocked() or self.next())
     self.stop_next()
 
 
@@ -1094,7 +1093,7 @@ class AppleFileConduitService(DeviceLinkService):
 
 class AppleFileConduitConnectWLink(wl.WorkflowLink):
   def proceed(self):
-    self.data['afc'].connect(self.data['did'], self.data['service_port'], lambda: self.blocked() or self.next())
+    self.data['afc'].connect(self.data.did, self.data.service_port, lambda: self.blocked() or self.next())
     self.stop_next()
 
 
@@ -1130,11 +1129,11 @@ class TestBackup:
       UxbMuxConnectToLockdownWLink(self.data, did=self.did, sn = self.sn),
       # LockdownStartAnotherServiceWLink(self.data, service=AppleFileConduitService.SERVICE_NAME, use_escrow_bag=False),
       # AppleFileConduitConnectWLink(self.data),
-      LockdownStartAnotherServiceWLink(self.data, service=NotificationProxyService.SERVICE_NAME, use_escrow_bag=False),
-      NotificationProxyConnectWLink(self.data),
-      # LockdownStartAnotherServiceWLink(self.data, service=MobileBackup2Service.SERVICE_NAME, use_escrow_bag=True),
-      # MobileBackup2ConnectToWLink(self.data),
-      # MobileBackup2HelloWLink(self.data),
+      # LockdownStartAnotherServiceWLink(self.data, service=NotificationProxyService.SERVICE_NAME, use_escrow_bag=False),
+      # NotificationProxyConnectWLink(self.data),
+      LockdownStartAnotherServiceWLink(self.data, service=MobileBackup2Service.SERVICE_NAME, use_escrow_bag=True),
+      MobileBackup2ConnectToWLink(self.data),
+      MobileBackup2HelloWLink(self.data),
       wl.ProxyWorkflowLink(lambda: self.on_exit(None)))
     workflow.start()
 
