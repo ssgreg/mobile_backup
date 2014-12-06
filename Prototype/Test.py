@@ -15,6 +15,7 @@ import tempfile
 import argparse
 #
 import wl
+import usbmux
 
 
 def configure_logger():
@@ -422,36 +423,6 @@ def connect():
     sock.connect(('127.0.0.1', 27015))
   return sock
 
-
-def create_usbmux_message(command):
-  pl = dict(
-    BundleID = 'org.acronis.usbmuxd',
-    ClientVersionString = '1.0.0',
-    MessageType = command,
-    ProgName = 'Acronis Mobile Backup',
-    kLibUSBMuxVersion = 1)
-  return pl
-
-def create_usbmux_message_list_devices():
-  return create_usbmux_message('ListDevices')
-
-def create_usbmux_message_read_buid():
-  return create_usbmux_message('ReadBUID')
-
-def create_usbmux_message_listen():
-  return create_usbmux_message('Listen')
-
-def create_usbmux_message_connect(did, port):
-  plist_data = create_usbmux_message('Connect')
-  plist_data['DeviceID'] = did
-  plist_data['PortNumber'] = socket.htons(port)
-  return plist_data
-
-def create_usbmux_message_read_pair_record(sn):
-  plist_data = create_usbmux_message('ReadPairRecord')
-  plist_data['PairRecordID'] = sn
-  return plist_data
-
 def create_lockdown_message_query_type():
   return dict(Request = 'QueryType')
 
@@ -517,7 +488,7 @@ class TestGetDeviceList:
     self.connection = Connection(self.io_service, connect())
     self.internal_session = UsbMuxSession(self.connection)
     logger().debug('Getting device list...')
-    self.internal_session.send(create_usbmux_message_list_devices(), self.on_devices)
+    self.internal_session.send(usbmux.create_usbmux_message_list_devices(), self.on_devices)
 
   def on_devices(self, devices):
     print('device list:')
@@ -544,7 +515,7 @@ class TestListenForDevices:
     self.internal_session.on_notification = self.on_notification
     #
     logger().debug('Listening for devices...')
-    self.internal_session.send(create_usbmux_message_listen(), self.on_listen)
+    self.internal_session.send(usbmux.create_usbmux_message_listen(), self.on_listen)
 
 
   def on_listen(self, confirmation):
@@ -582,7 +553,7 @@ class ConnectToUsbMuxdWLink(wl.WorkflowLink):
 class ListDevicesWLink(wl.WorkflowLink):
   def proceed(self):
     logger().debug('ListDevicesWLink: Getting device list...')
-    self.data.session.send(create_usbmux_message_list_devices(), lambda x: self.blocked() or self.on_list_devices(x))
+    self.data.session.send(usbmux.create_usbmux_message_list_devices(), lambda x: self.blocked() or self.on_list_devices(x))
     self.stop_next()
 
   def on_list_devices(self, result):
@@ -601,7 +572,7 @@ class ListDevicesWLink(wl.WorkflowLink):
 class ReadBuidWLink(wl.WorkflowLink):
   def proceed(self):
     logger().debug('Reading BUID')
-    self.data.session.send(create_usbmux_message_read_buid(), lambda x: self.blocked() or self.on_read_buid(x))
+    self.data.session.send(usbmux.create_usbmux_message_read_buid(), lambda x: self.blocked() or self.on_read_buid(x))
     self.stop_next()
 
   def on_read_buid(self, result):
@@ -620,7 +591,7 @@ class ReadBuidWLink(wl.WorkflowLink):
 class ReadPairRecordWLink(wl.WorkflowLink):
   def proceed(self):
     logger().debug('Reading pair record of a device with a sn = {0}'.format(self.data.sn))
-    self.data.session.send(create_usbmux_message_read_pair_record(self.data.sn), lambda x: self.blocked() or self.on_get_pair_record(x))
+    self.data.session.send(usbmux.create_usbmux_message_read_pair_record(self.data.sn), lambda x: self.blocked() or self.on_get_pair_record(x))
     self.stop_next()
 
   def on_get_pair_record(self, result):
@@ -639,7 +610,7 @@ class ReadPairRecordWLink(wl.WorkflowLink):
 class ConnectToServiceWLink(wl.WorkflowLink):
   def proceed(self):
     logger().debug('Connecting to a service, did = {0} port = {1}'.format(self.data.did, self.data.service_port))
-    self.data.session.send(create_usbmux_message_connect(self.data.did, self.data.service_port), lambda x: self.blocked() or self.on_connect(x))
+    self.data.session.send(usbmux.create_usbmux_message_connect(self.data.did, self.data.service_port), lambda x: self.blocked() or self.on_connect(x))
     self.stop_next()
 
   def on_connect(self, confirmation):
@@ -1127,7 +1098,7 @@ class TestBackup:
 
   def on_enter(self):
     workflow = wl.WorkflowBatch(
-      UxbMuxConnectToLockdownWLink(self.data, did=self.did, sn = self.sn),
+      UxbMuxConnectToLockdownWLink(self.data, did=self.did, sn=self.sn),
       LockdownStartAnotherServiceWLink(self.data, service=AppleFileConduitService.SERVICE_NAME, use_escrow_bag=False),
       AppleFileConduitConnectWLink(self.data),
       LockdownStartAnotherServiceWLink(self.data, service=NotificationProxyService.SERVICE_NAME, use_escrow_bag=False),
