@@ -21,10 +21,10 @@ import wl
 
 
 #
-# PlistHeader
+# LockdownHeader
 #
 
-class PlistHeader:
+class LockdownHeader:
   SIZE = 4
 
   def __init__(self, size=None):
@@ -37,23 +37,23 @@ class PlistHeader:
     self.size = struct.unpack_from('>I', encoded)[0]
 
 
-def makePlistHeader(size=None):
-  return PlistHeader(size)
+def makeLockdownHeader(size=None):
+  return LockdownHeader(size)
 
 
 #
-# PlistMessageChannel
+# LockdownMessageChannel
 #
 
-class PlistMessageChannel:
+class LockdownMessageChannel:
   def __init__(self, connection):
     self.connection = connection
     self.connection.on_ready_to_recv = self.__on_ready_to_recv
     self.on_incoming_message = lambda data: None
-    self.__message_receiver = MessageReceiver(makePlistHeader, PlistHeader.SIZE)
+    self.__message_receiver = MessageReceiver(makeLockdownHeader, LockdownHeader.SIZE)
 
   def send(self, data):
-    header = PlistHeader(len(data))
+    header = LockdownHeader(len(data))
     self.connection.send(header.encode())
     self.connection.send(data)
 
@@ -66,12 +66,12 @@ class PlistMessageChannel:
 
 
 #
-# PlistChannel
+# LockdownPlistChannel
 #
 
-class PlistChannel:
+class LockdownPlistChannel:
   def __init__(self, connection):
-    self.internal_channel = PlistMessageChannel(connection)
+    self.internal_channel = LockdownMessageChannel(connection)
     self.internal_channel.on_incoming_message = self.__on_incoming_message
     self.on_incoming_plist = lambda plist_data: None
 
@@ -92,7 +92,7 @@ class LockdownSession:
 
   def __init__(self, connection):
     self.__connection = connection
-    self.__channel = PlistChannel(connection)
+    self.__channel = LockdownPlistChannel(connection)
     self.__channel.on_incoming_plist = self.__on_incoming_plist
     self.reset()
     logger().debug('Lockdown session has started.')
@@ -127,7 +127,7 @@ class LockdownSession:
 
 class CommonServiceSession:
   def __init__(self, connection):
-    self.__channel = PlistChannel(connection)
+    self.__channel = LockdownPlistChannel(connection)
     self.__channel.on_incoming_plist = self.__on_incoming_plist
     self.on_notification = lambda plist_data: None
     self.reset()
