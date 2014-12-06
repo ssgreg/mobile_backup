@@ -19,7 +19,7 @@ class WorkflowLinkData:
     elif name in self.__dict__['__private_data']:
       return self.__dict__['__private_data'][name]
     else:
-      raise RuntimeError('Data: Key not found')
+      raise RuntimeError('Data: Key not found: {0}'.format(name))
 
 
 #
