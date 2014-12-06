@@ -10,8 +10,10 @@
 import plistlib
 import struct
 #
+from io_service import *
 from logger import *
 from tools import *
+import wl
 
 
 def create_usbmux_message(command):
@@ -147,3 +149,52 @@ class UsbMuxSession:
     else:
       self.callbacks[tag](plist_data)
       del self.callbacks[tag]
+
+
+#
+# UsbMuxInternalConnectToUsbMuxWLink
+#
+
+class UsbMuxInternalConnectToUsbMuxWLink(wl.WorkflowLink):
+  def proceed(self):
+    self.data.connection = Connection(self.data.io_service, self.data.do_connect())
+    self.next()
+
+
+#
+# UsbMuxInternalChangeSessionToUsbMuxWLink
+#
+
+class UsbMuxInternalChangeSessionToUsbMuxWLink(wl.WorkflowLink):
+  def proceed(self):
+    self.data.session = usbmux.UsbMuxSession(self.data.connection)
+    self.next()
+
+
+#
+# UsbMuxService
+#
+
+class UsbMuxService:
+  def __init__(self, io_service, do_connect):
+    self.data = dict(io_service=io_service, do_connect=do_connect)
+    self.workflow = None
+
+  def connect(self, on_result):
+    self.workflow = wl.WorkflowBatch(
+      UsbMuxInternalConnectToUsbMuxWLink(self.data),
+      UsbMuxInternalChangeSessionToUsbMuxWLink(self.data),
+      wl.ProxyWorkflowLink(on_result))
+    self.workflow.start()
+
+  def connect_to_service(self, did, port, on_result):
+    pass
+
+  def list_devices(self, on_result):
+    pass
+
+  def read_buid(self, on_result):
+    pass
+
+  def read_pair_record(self, on_rsult):
+    pass
