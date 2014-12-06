@@ -772,16 +772,19 @@ class LockdownStartServiceWLink(wl.WorkflowLink):
 
 class LockdownInternalFixArguments(wl.WorkflowLink):
   def proceed(self):
+    # sn only
     if self.data['sn'] and not self.data['did']:
       for device in self.data['devices']:
         if device['Properties']['SerialNumber'] == self.data['sn'] and device['Properties']['ConnectionType'] == 'USB':
           self.data['did'] = device['DeviceID']
           break
+    # did only
     elif self.data['did'] and not self.data['sn']:
       for device in self.data['devices']:
         if device['DeviceID'] == self.data['did'] and device['Properties']['ConnectionType'] == 'USB':
           self.data['sn'] = device['Properties']['SerialNumber']
           break
+    # both
     if self.data['sn'] and self.data['did']:
       self.next()
     else:
