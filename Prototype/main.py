@@ -64,32 +64,6 @@ def connect():
     sock.connect(('127.0.0.1', 27015))
   return sock
 
-def create_lockdown_message_query_type():
-  return dict(Request = 'QueryType')
-
-def create_lockdown_message_validate_pair(host_id):
-  return dict(
-    Label='test',
-    PairRecord = dict(HostID = host_id),
-    Request = 'ValidatePair',
-    ProtocolVersion = '2')
-
-def create_lockdown_message_start_session(host_id, buid):
-  return dict(
-    Label='test',
-    Request='StartSession',
-    HostID=host_id,
-    SystemBUID=buid)
-
-def create_lockdown_message_start_service(service, escrow_bag=None):
-  result = dict(
-    Label='test',
-    Request='StartService',
-    Service=service)
-  if escrow_bag:
-    result['EscrowBag'] = escrow_bag
-  return result
-
 def create_device_link_message_dl_version_ok(major, minor):
   return [
     'DLMessageVersionExchange',
@@ -301,7 +275,7 @@ class LockdownServiceCheckTypeWLink(wl.WorkflowLink):
 
   def proceed(self):
     logger().debug('Checking lockdown service type...')
-    self.data.session.send(create_lockdown_message_query_type(), lambda x: self.blocked() or self.on_check_lockdown_type(x))
+    self.data.session.send(lockdown.create_lockdown_message_query_type(), lambda x: self.blocked() or self.on_check_lockdown_type(x))
     self.stop_next()
 
   def on_check_lockdown_type(self, result):
@@ -319,7 +293,7 @@ class LockdownServiceCheckTypeWLink(wl.WorkflowLink):
 class LockdownValidatePairRecordWLink(wl.WorkflowLink):
   def proceed(self):
     logger().debug('Validating pair record with HostID = {0}'.format(self.data.pair_record_data['HostID']))
-    self.data.session.send(create_lockdown_message_validate_pair(self.data.pair_record_data['HostID']), lambda x: self.blocked() or self.on_validate_pair_record(x))
+    self.data.session.send(lockdown.create_lockdown_message_validate_pair(self.data.pair_record_data['HostID']), lambda x: self.blocked() or self.on_validate_pair_record(x))
     self.stop_next()
 
   def on_validate_pair_record(self, result):
@@ -340,7 +314,7 @@ class LockdownStartSessionWLink(wl.WorkflowLink):
     buid = self.data.buid
     #
     logger().debug('Starting lockdown session with HostID = {0} and BUID = {1}'.format(hostID, buid))
-    self.data.session.send(create_lockdown_message_start_session(hostID, buid), lambda x: self.blocked() or self.on_start_session(x))
+    self.data.session.send(lockdown.create_lockdown_message_start_session(hostID, buid), lambda x: self.blocked() or self.on_start_session(x))
     self.stop_next()
 
   def on_start_session(self, result):
@@ -363,7 +337,7 @@ class LockdownStartServiceWLink(wl.WorkflowLink):
   def proceed(self):
     logger().debug('Starting {0} via Lockdown {1} escrow bag'.format(self.data.service_name, "with" if self.data.use_escrow_bag else "without"))
     escrow_bag = self.data.pair_record_data['EscrowBag'] if self.data.use_escrow_bag else None
-    self.data.session.send(create_lockdown_message_start_service(self.data.service_name, escrow_bag), lambda x: self.blocked() or self.on_start_service(x))
+    self.data.session.send(lockdown.create_lockdown_message_start_service(self.data.service_name, escrow_bag), lambda x: self.blocked() or self.on_start_service(x))
     self.stop_next()
 
   def on_start_service(self, result):

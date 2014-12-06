@@ -13,6 +13,34 @@ import struct
 from logger import *
 from tools import *
 
+
+def create_lockdown_message_query_type():
+  return dict(Request = 'QueryType')
+
+def create_lockdown_message_validate_pair(host_id):
+  return dict(
+    Label='test',
+    PairRecord = dict(HostID = host_id),
+    Request = 'ValidatePair',
+    ProtocolVersion = '2')
+
+def create_lockdown_message_start_session(host_id, buid):
+  return dict(
+    Label='test',
+    Request='StartSession',
+    HostID=host_id,
+    SystemBUID=buid)
+
+def create_lockdown_message_start_service(service, escrow_bag=None):
+  result = dict(
+    Label='test',
+    Request='StartService',
+    Service=service)
+  if escrow_bag:
+    result['EscrowBag'] = escrow_bag
+  return result
+
+
 #
 # LockdownHeader
 #
