@@ -13,6 +13,7 @@ import tempfile
 import argparse
 #
 from logger import *
+from tools import *
 import wl
 import usbmux
 
@@ -155,36 +156,6 @@ class PlistHeader:
 
 def makePlistHeader(size=None):
   return PlistHeader(size)
-
-
-#
-# MessageReceiver
-#
-
-class MessageReceiver:
-  def __init__(self, header_factory=None, header_size=None):
-    self.__header_factory = header_factory
-    self.__header_size = header_size
-    self.reset()
-
-  def recv(self, connection):
-    if not self.header:
-      if len(self.data) < self.__header_size:
-        self.data += connection.recv(self.__header_size - len(self.data))
-        if len(self.data) == self.__header_size:
-          self.header = self.__header_factory()
-          self.header.decode(self.data)
-          self.data = b''
-    if self.header:
-      if len(self.data) < self.header.size:
-        self.data += connection.recv(self.header.size - len(self.data))
-        if len(self.data) == self.header.size:
-          return True
-    return False
-
-  def reset(self):
-    self.header = None
-    self.data = b''
 
 
 #
@@ -1129,22 +1100,3 @@ def Main():
   io_service.run()
 
 Main()
-
-
-# <?xml version="1.0" encoding="UTF-8"?>
-# <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-# <plist version="1.0">
-# <array>
-#   <string>DLMessageProcessMessage</string>
-#   <dict>
-#   <key>SupportedProtocolVersions</key>
-#   <array>
-#   <real>2.000000</real>
-#   <real>2.100000</real>
-#   </array>
-#   <key>MessageName</key>
-#   <string>Hello</string>
-#   </dict>
-# </array>
-# </plist>
-# 
