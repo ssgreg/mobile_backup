@@ -137,31 +137,6 @@ class Connection:
 
 
 #
-# UsbMuxHeader
-#
-
-class UsbMuxHeader:
-  SIZE = 16
-
-  def __init__(self, size=None, version=None, mtype=None, tag=None):
-    self.size = size
-    self.version = version
-    self.mtype = mtype
-    self.tag = tag
-
-  def encode(self):
-    return struct.pack('<IIII', self.size  + self.SIZE, self.version, self.mtype, self.tag)
-
-  def decode(self, encoded):
-    self.size, self.version, self.mtype, self.tag = struct.unpack_from('<IIII', encoded)
-    self.size -= self.SIZE
-
-
-def makeUsbMuxHeader(size=None, version=None, mtype=None, tag=None):
-  return UsbMuxHeader(size, version, mtype, tag)
-
-
-#
 # PlistHeader
 #
 
@@ -223,10 +198,10 @@ class UsbMuxMessageChannel:
     self.connection = connection
     self.connection.on_ready_to_recv = self.__on_ready_to_recv
     self.on_incoming_message = lambda data, tag, mtype: None
-    self.__message_receiver = MessageReceiver(makeUsbMuxHeader, UsbMuxHeader.SIZE)
+    self.__message_receiver = MessageReceiver(usbmux.makeUsbMuxHeader, usbmux.UsbMuxHeader.SIZE)
 
   def send(self, data, tag, mtype):
-    header = UsbMuxHeader(len(data), self.USBMUX_VERSION, mtype, tag)
+    header = usbmux.UsbMuxHeader(len(data), self.USBMUX_VERSION, mtype, tag)
     self.connection.send(header.encode())
     self.connection.send(data)
 
