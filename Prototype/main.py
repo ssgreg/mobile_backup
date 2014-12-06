@@ -183,28 +183,6 @@ class PlistMessageChannel:
 
 
 #
-# UsbMuxPlistChannel
-#
-
-class UsbMuxPlistChannel:
-  PLIST_MTYPE = 8
-
-  def __init__(self, connection):
-    self.internal_channel = usbmux.UsbMuxMessageChannel(connection)
-    self.internal_channel.on_incoming_message = self.__on_incoming_message
-    self.on_incoming_plist = lambda plist_data, tag: None
-
-  def send(self, plist_data, tag):
-    self.internal_channel.send(plistlib.dumps(plist_data), tag, self.PLIST_MTYPE)
-
-  def __on_incoming_message(self, data, tag, mtype):
-    if mtype != self.PLIST_MTYPE:
-      raise RuntimeError('Unsupported message type.')
-    plist_data = plistlib.loads(data)
-    self.on_incoming_plist(plist_data, tag)
-
-
-#
 # PlistChannel
 #
 
@@ -220,35 +198,6 @@ class PlistChannel:
   def __on_incoming_message(self, data):
     plist_data = plistlib.loads(data)
     self.on_incoming_plist(plist_data)
-
-
-#
-# UsbMuxSession
-#
-
-class UsbMuxSession:
-  TAG_NOTIFICATION = 0
-  TAG_FIRST = 0x1000000
-
-  def __init__(self, connection):
-    self.__channel = UsbMuxPlistChannel(connection)
-    self.__channel.on_incoming_plist = self.__on_incoming_plist
-    self.on_notification = lambda plist_data: None
-    self.callbacks = {}
-    self.tag = self.TAG_FIRST
-    logger().debug('UsbMux session has started.')
-
-  def send(self, plist_data, on_result):
-    self.callbacks[self.tag] = on_result
-    self.__channel.send(plist_data, self.tag)
-    self.tag += 1
-
-  def __on_incoming_plist(self, plist_data, tag):
-    if tag == self.TAG_NOTIFICATION:
-      self.on_notification(plist_data)
-    else:
-      self.callbacks[tag](plist_data)
-      del self.callbacks[tag]
 
 
 #
@@ -395,7 +344,7 @@ class TestGetDeviceList:
 
   def start(self):
     self.connection = Connection(self.io_service, connect())
-    self.internal_session = UsbMuxSession(self.connection)
+    self.internal_session = usbmux.UsbMuxSession(self.connection)
     logger().debug('Getting device list...')
     self.internal_session.send(usbmux.create_usbmux_message_list_devices(), self.on_devices)
 
@@ -420,7 +369,7 @@ class TestListenForDevices:
 
   def start(self):
     self.connection = Connection(self.io_service, connect())
-    self.internal_session = UsbMuxSession(self.connection)
+    self.internal_session = usbmux.UsbMuxSession(self.connection)
     self.internal_session.on_notification = self.on_notification
     #
     logger().debug('Listening for devices...')
@@ -546,7 +495,7 @@ class SessionChangeToLockdown(wl.WorkflowLink):
 
 class SessionChangeToUsbMuxWLink(wl.WorkflowLink):
   def proceed(self):
-    self.data.session = UsbMuxSession(self.data.connection)
+    self.data.session = usbmux.UsbMuxSession(self.data.connection)
     self.next()
 
 

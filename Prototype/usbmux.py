@@ -8,8 +8,10 @@
 #
 
 import struct
+import plistlib
 #
 from tools import *
+from logger import *
 
 
 def create_usbmux_message(command):
@@ -94,3 +96,54 @@ class UsbMuxMessageChannel:
       header = self.__message_receiver.header
       self.__message_receiver.reset()
       self.on_incoming_message(data, header.tag, header.mtype)
+
+
+#
+# UsbMuxPlistChannel
+#
+
+class UsbMuxPlistChannel:
+  PLIST_MTYPE = 8
+
+  def __init__(self, connection):
+    self.internal_channel = UsbMuxMessageChannel(connection)
+    self.internal_channel.on_incoming_message = self.__on_incoming_message
+    self.on_incoming_plist = lambda plist_data, tag: None
+
+  def send(self, plist_data, tag):
+    self.internal_channel.send(plistlib.dumps(plist_data), tag, self.PLIST_MTYPE)
+
+  def __on_incoming_message(self, data, tag, mtype):
+    if mtype != self.PLIST_MTYPE:
+      raise RuntimeError('Unsupported message type.')
+    plist_data = plistlib.loads(data)
+    self.on_incoming_plist(plist_data, tag)
+
+
+#
+# UsbMuxSession
+#
+
+class UsbMuxSession:
+  TAG_NOTIFICATION = 0
+  TAG_FIRST = 0x1000000
+
+  def __init__(self, connection):
+    self.__channel = UsbMuxPlistChannel(connection)
+    self.__channel.on_incoming_plist = self.__on_incoming_plist
+    self.on_notification = lambda plist_data: None
+    self.callbacks = {}
+    self.tag = self.TAG_FIRST
+    logger().debug('UsbMux session has started.')
+
+  def send(self, plist_data, on_result):
+    self.callbacks[self.tag] = on_result
+    self.__channel.send(plist_data, self.tag)
+    self.tag += 1
+
+  def __on_incoming_plist(self, plist_data, tag):
+    if tag == self.TAG_NOTIFICATION:
+      self.on_notification(plist_data)
+    else:
+      self.callbacks[tag](plist_data)
+      del self.callbacks[tag]
