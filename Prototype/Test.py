@@ -900,42 +900,6 @@ class LockdownStartAnotherServiceWLink(wl.WorkflowLink):
 
 
 #
-# NotificationProxyService
-#
-
-class NotificationProxyService:
-  SERVICE_NAME = 'com.apple.mobile.notification_proxy'
-
-  def __init__(self, io_service):
-    self.io_service = io_service
-    self.data = dict(io_service=self.io_service)
-
-  def connect(self, did, port, on_result):
-    workflow = wl.WorkflowBatch(
-      ConnectToUsbMuxdWLink(self.data),
-      SessionChangeToUsbMuxWLink(self.data),
-      ConnectToServiceWLink(self.data, did=did, service_port=port),
-      wl.ProxyWorkflowLink(on_result))
-    workflow.start()
-
-
-  def close(self):
-    if 'connection' in self.data:
-      logger().debug('Closing notification proxy connection...')
-      self.data['connection'].close()
-
-
-#
-# NotificationProxyConnectWLink
-#
-
-class NotificationProxyConnectWLink(wl.WorkflowLink):
-  def proceed(self):
-    self.data.notification_proxy.connect(self.data.did, self.data.service_port, lambda: self.blocked() or self.next())
-    self.stop_next()
-
-
-#
 # DeviceLinkVersionExchangeWLink
 #
 
@@ -1103,7 +1067,6 @@ class AppleFileConduitService(DeviceLinkService):
     super().__init__(io_service)
 
 
-
 #
 # AppleFileConduitConnectWLink
 #
@@ -1111,6 +1074,27 @@ class AppleFileConduitService(DeviceLinkService):
 class AppleFileConduitConnectWLink(wl.WorkflowLink):
   def proceed(self):
     self.data.afc.connect(self.data.did, self.data.service_port, lambda: self.blocked() or self.next())
+    self.stop_next()
+
+
+#
+# NotificationProxyService
+#
+
+class NotificationProxyService(DeviceLinkService):
+  SERVICE_NAME = 'com.apple.mobile.notification_proxy'
+
+  def __init__(self, io_service):
+    super().__init__(io_service)
+
+
+#
+# NotificationProxyConnectWLink
+#
+
+class NotificationProxyConnectWLink(wl.WorkflowLink):
+  def proceed(self):
+    self.data.notification_proxy.connect(self.data.did, self.data.service_port, lambda: self.blocked() or self.next())
     self.stop_next()
 
 
