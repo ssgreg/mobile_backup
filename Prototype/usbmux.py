@@ -7,11 +7,11 @@
 #  Copyright (c) 2014 Grigory Zubankov. All rights reserved.
 #
 
-import struct
 import plistlib
+import struct
 #
-from tools import *
 from logger import *
+from tools import *
 
 
 def create_usbmux_message(command):

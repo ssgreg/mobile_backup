@@ -7,18 +7,17 @@
 #  Copyright (c) 2014 Grigory Zubankov. All rights reserved.
 #
 
-import socket
-import plistlib
-import struct
-import binascii
-import sys
 import argparse
+import plistlib
+import socket
+import struct
+import sys
 #
+from io_service import *
 from logger import *
 from tools import *
-from io_service import *
-import wl
 import usbmux
+import wl
 
 
 #
