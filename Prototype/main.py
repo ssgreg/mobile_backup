@@ -159,32 +159,6 @@ def makePlistHeader(size=None):
 
 
 #
-# UsbMuxMessageChannel
-#
-
-class UsbMuxMessageChannel:
-  USBMUX_VERSION = 1
-
-  def __init__(self, connection):
-    self.connection = connection
-    self.connection.on_ready_to_recv = self.__on_ready_to_recv
-    self.on_incoming_message = lambda data, tag, mtype: None
-    self.__message_receiver = MessageReceiver(usbmux.makeUsbMuxHeader, usbmux.UsbMuxHeader.SIZE)
-
-  def send(self, data, tag, mtype):
-    header = usbmux.UsbMuxHeader(len(data), self.USBMUX_VERSION, mtype, tag)
-    self.connection.send(header.encode())
-    self.connection.send(data)
-
-  def __on_ready_to_recv(self):
-    if self.__message_receiver.recv(self.connection):
-      data = self.__message_receiver.data
-      header = self.__message_receiver.header
-      self.__message_receiver.reset()
-      self.on_incoming_message(data, header.tag, header.mtype)
-
-
-#
 # PlistMessageChannel
 #
 
@@ -216,7 +190,7 @@ class UsbMuxPlistChannel:
   PLIST_MTYPE = 8
 
   def __init__(self, connection):
-    self.internal_channel = UsbMuxMessageChannel(connection)
+    self.internal_channel = usbmux.UsbMuxMessageChannel(connection)
     self.internal_channel.on_incoming_message = self.__on_incoming_message
     self.on_incoming_plist = lambda plist_data, tag: None
 

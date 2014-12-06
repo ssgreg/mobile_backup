@@ -8,6 +8,8 @@
 #
 
 import struct
+#
+from tools import *
 
 
 def create_usbmux_message(command):
@@ -66,3 +68,29 @@ class UsbMuxHeader:
 
 def makeUsbMuxHeader(size=None, version=None, mtype=None, tag=None):
   return UsbMuxHeader(size, version, mtype, tag)
+
+
+#
+# UsbMuxMessageChannel
+#
+
+class UsbMuxMessageChannel:
+  USBMUX_VERSION = 1
+
+  def __init__(self, connection):
+    self.connection = connection
+    self.connection.on_ready_to_recv = self.__on_ready_to_recv
+    self.on_incoming_message = lambda data, tag, mtype: None
+    self.__message_receiver = MessageReceiver(makeUsbMuxHeader, UsbMuxHeader.SIZE)
+
+  def send(self, data, tag, mtype):
+    header = UsbMuxHeader(len(data), self.USBMUX_VERSION, mtype, tag)
+    self.connection.send(header.encode())
+    self.connection.send(data)
+
+  def __on_ready_to_recv(self):
+    if self.__message_receiver.recv(self.connection):
+      data = self.__message_receiver.data
+      header = self.__message_receiver.header
+      self.__message_receiver.reset()
+      self.on_incoming_message(data, header.tag, header.mtype)
