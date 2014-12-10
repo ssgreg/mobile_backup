@@ -93,12 +93,14 @@ class SafeIOService:
 
 class Connection:
   def __init__(self, service, io):
+    logger().debug('New connection: {0}'.format(io))
     self.__io = io
     self.__service = service
     self.__service.register(io, self.__on_ready_to_recv)
     self.on_ready_to_recv = lambda: None
 
   def close(self):
+    logger().debug('Closing connection: {0}'.format(self.__io))
     self.__service.unregister(self.__io)
     self.__io.close()
 

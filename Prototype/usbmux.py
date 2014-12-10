@@ -157,7 +157,7 @@ class UsbMuxSession:
 
 class UsbMuxInternalConnectToUsbMuxWLink(wl.WorkflowLink):
   def proceed(self):
-    self.data.connection = Connection(self.data.io_service, self.data.do_connect())
+    self.data.connection = self.data.connect()
     self.next()
 
 
@@ -167,8 +167,86 @@ class UsbMuxInternalConnectToUsbMuxWLink(wl.WorkflowLink):
 
 class UsbMuxInternalChangeSessionToUsbMuxWLink(wl.WorkflowLink):
   def proceed(self):
-    self.data.session = usbmux.UsbMuxSession(self.data.connection)
+    self.data.session = UsbMuxSession(self.data.connection)
     self.next()
+
+
+#
+# UsbMuxInternalListDevicesWLink
+#
+
+class UsbMuxInternalListDevicesWLink(wl.WorkflowLink):
+  def proceed(self):
+    logger().debug('UsbMuxInternalListDevicesWLink: Getting device list...')
+    self.data.session.send(create_usbmux_message_list_devices(), lambda x: self.blocked() or self.on_list_devices(x))
+    self.stop_next()
+
+  def on_list_devices(self, result):
+    if 'DeviceList' in result:
+      self.data.devices = [UsbMuxDevice(self.data.usbmux, d, self.data.buid) for d in result['DeviceList']]
+      # remove all non-USB devices
+      self.data.devices = [d for d in self.data.devices if d.connected_via_usb()]
+      #
+      logger().debug('UsbMuxInternalListDevicesWLink: Done. Count = {0}'.format(len(self.data.devices)))
+      self.next()
+    else:
+      raise RuntimeError('Failed to list devices')
+
+
+#
+# UsbMuxInternalReadBuidWLink
+#
+
+class UsbMuxInternalReadBuidWLink(wl.WorkflowLink):
+  def proceed(self):
+    logger().debug('UsbMuxInternalReadBuidWLink: Reading BUID')
+    self.data.session.send(create_usbmux_message_read_buid(), lambda x: self.blocked() or self.on_read_buid(x))
+    self.stop_next()
+
+  def on_read_buid(self, result):
+    if 'BUID' in result:
+      self.data.buid = result['BUID']
+      logger().debug('UsbMuxInternalReadBuidWLink: Done. BUID = {0}'.format(self.data.buid))
+      self.next();
+    else:
+      raise RuntimeError('Failed to read BUID')
+
+
+#
+# UsbMuxInternalReadPairRecordWLink
+#
+
+class UsbMuxInternalReadPairRecordWLink(wl.WorkflowLink):
+  def proceed(self):
+    logger().debug('UsbMuxInternalReadPairRecordWLink: Reading pair record of a device with a sn = {0}'.format(self.data.sn))
+    self.data.session.send(create_usbmux_message_read_pair_record(self.data.sn), lambda x: self.blocked() or self.on_get_pair_record(x))
+    self.stop_next()
+
+  def on_get_pair_record(self, result):
+    if 'PairRecordData' in result:
+      self.data.pair_record_data = plistlib.loads(result['PairRecordData'])
+      logger().debug('UsbMuxInternalReadPairRecordWLink: Done. HostID = {0}'.format(self.data.pair_record_data['HostID']))
+      self.next();
+    else:
+      raise RuntimeError('Failed to read pair record')
+
+
+#
+# UsbMuxInternalConnectToServiceWLink
+#
+
+class UsbMuxInternalConnectToServiceWLink(wl.WorkflowLink):
+  def proceed(self):
+    logger().debug('UsbMuxInternalConnectToServiceWLink: Connecting to a service, did = {0} port = {1}'.format(self.data.did, self.data.port))
+    self.data.session.send(create_usbmux_message_connect(self.data.did, self.data.port), lambda x: self.blocked() or self.on_connect(x))
+    self.stop_next()
+
+  def on_connect(self, confirmation):
+    if confirmation['Number'] == 0:
+      logger().debug('UsbMuxInternalConnectToServiceWLink: Done.')
+      self.next();
+    else:
+      raise RuntimeError('Failed to connect with an error = {0}'.format(confirmation['Number']))
 
 
 #
@@ -176,25 +254,189 @@ class UsbMuxInternalChangeSessionToUsbMuxWLink(wl.WorkflowLink):
 #
 
 class UsbMuxService:
-  def __init__(self, io_service, do_connect):
-    self.data = dict(io_service=io_service, do_connect=do_connect)
-    self.workflow = None
-
-  def connect(self, on_result):
+  def __init__(self, connect, on_result):
+    logger().debug('UsbMuxService: Connecting to usbmux service...')
+    self.data = dict(connect=connect, usbmux=self)
+    #
     self.workflow = wl.WorkflowBatch(
       UsbMuxInternalConnectToUsbMuxWLink(self.data),
       UsbMuxInternalChangeSessionToUsbMuxWLink(self.data),
-      wl.ProxyWorkflowLink(on_result))
+    )
     self.workflow.start()
 
   def connect_to_service(self, did, port, on_result):
-    pass
+    data = dict(self.data)
+    self.workflow = wl.WorkflowBatch(
+      UsbMuxInternalConnectToUsbMuxWLink(data),
+      UsbMuxInternalChangeSessionToUsbMuxWLink(data),
+      UsbMuxInternalConnectToServiceWLink(data, did=did, port=port),
+      wl.ProxyWorkflowLink(lambda: on_result(data['connection']))
+    )
+    self.workflow.start()
 
   def list_devices(self, on_result):
-    pass
+    self.workflow = wl.WorkflowBatch(
+      UsbMuxReadBuidWLink(self.data),
+      UsbMuxInternalListDevicesWLink(self.data),
+      wl.ProxyWorkflowLink(lambda: on_result(self.data['devices']))
+    )
+    self.workflow.start()
 
   def read_buid(self, on_result):
-    pass
+    self.workflow = wl.WorkflowBatch(
+      UsbMuxInternalReadBuidWLink(self.data),
+      wl.ProxyWorkflowLink(lambda: on_result(self.data['buid']))
+    )
+    self.workflow.start()
 
-  def read_pair_record(self, on_rsult):
-    pass
+  def read_pair_record(self, sn, on_result):
+    self.workflow = wl.WorkflowBatch(
+      UsbMuxInternalReadPairRecordWLink(self.data, sn=sn),
+      wl.ProxyWorkflowLink(lambda: on_result(self.data['pair_record_data']))
+    )
+    self.workflow.start()
+
+  def close(self):
+    if 'connection' in self.data:
+      logger().debug('Closing usbmux connection...')
+      self.data['connection'].close()
+      self.data['connection'] = None
+
+
+#
+# UsbMuxMakeServiceWLink
+#
+
+class UsbMuxMakeServiceWLink(wl.WorkflowLink):
+  def proceed(self):
+    # TODO: Make connection async
+    self.data.usbmux = UsbMuxService(self.data.connect_to_usbmux, None)
+    self.next()
+
+
+#
+# UsbMuxListDevicesWLink
+#
+
+class UsbMuxListDevicesWLink(wl.WorkflowLink):
+  def proceed(self):
+    self.data.usbmux.list_devices(lambda x: self.blocked() or self.on_list_devices(x))
+    self.stop_next()
+
+  def on_list_devices(self, devices):
+    self.data.devices = devices
+    self.next()
+
+
+#
+# UsbMuxReadBuidWLink
+#
+
+class UsbMuxReadBuidWLink(wl.WorkflowLink):
+  def proceed(self):
+    self.data.usbmux.read_buid(lambda x: self.blocked() or self.on_read_buid(x))
+    self.stop_next()
+
+  def on_read_buid(self, buid):
+    self.data.buid = buid
+    self.next()
+
+
+#
+# UsbMuxReadPairRecordWLink
+#
+
+class UsbMuxReadPairRecordWLink(wl.WorkflowLink):
+  def proceed(self):
+    self.data.usbmux.read_pair_record(self.data.device.sn, lambda x: self.blocked() or self.on_read_pair_record(x))
+    self.stop_next()
+
+  def on_read_pair_record(self, data):
+    self.data.pair_record_data = data
+    self.next()
+
+
+#
+# UsbMuxConnectToServiceWLink
+#
+
+class UsbMuxConnectToServiceWLink(wl.WorkflowLink):
+  def proceed(self):
+    self.data.usbmux.connect_to_service(self.data.did, self.data.port, lambda x: self.blocked() or self.on_connect_to_service(x))
+    self.stop_next()
+
+  def on_connect_to_service(self, connection):
+    self.data.service_connection = data
+    self.next()
+
+
+#
+# UsbMuxDevice
+#
+
+class UsbMuxDevice:
+  def __init__(self, usbmux, info, buid):
+    self.usbmux = usbmux
+    self.__info = info
+    self.__buid = buid
+
+  def connect_to_service(self, port, on_result):
+    self.usbmux.connect_to_service(self.did, port, on_result)
+
+  def read_pair_record(self, on_result):
+    self.usbmux.read_pair_record(self.sn, on_result)
+
+  def connected_via_usb(self):
+    return self.connection_type == 'USB'
+
+  def display(self):
+    return '(UsbMuxDevice | did = {0} | sn = {1} | type = {2})'.format(self.did, self.sn, self.connection_type)
+
+  @property
+  def buid(self):
+    return self.__buid
+
+  @property
+  def did(self):
+    return self.__info['DeviceID']
+
+  @property
+  def sn(self):
+    return self.__info['Properties']['SerialNumber']
+
+  @property
+  def connection_type(self):
+    # USB or Network
+    return self.__info['Properties']['ConnectionType']
+
+  @property
+  def info(self):
+    return self.__info
+
+
+#
+# UsbMuxDeviceConnectToServiceWLink
+#
+
+class UsbMuxDeviceConnectToServiceWLink(wl.WorkflowLink):
+  def proceed(self):
+    self.data.device.connect_to_service(self.data.port, lambda x: self.blocked() or self.on_connect_to_service(x))
+    self.stop_next()
+
+  def on_connect_to_service(self, connection):
+    self.data.service_connection = connection
+    self.next()
+
+
+#
+# UsbMuxDeviceReadPairRecordWLink
+#
+
+class UsbMuxDeviceReadPairRecordWLink(wl.WorkflowLink):
+  def proceed(self):
+    self.data.device.read_pair_record(lambda x: self.blocked() or self.on_read_pair_record(x))
+    self.stop_next()
+
+  def on_read_pair_record(self, pair_record_data):
+    self.data.pair_record_data = pair_record_data
+    self.next()
