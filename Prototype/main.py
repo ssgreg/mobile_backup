@@ -302,27 +302,6 @@ class MobileBackup2HelloWLink(wl.WorkflowLink):
 
 
 #
-# NotificationProxyService
-#
-
-class NotificationProxyService(DeviceLinkService):
-  SERVICE_NAME = 'com.apple.mobile.notification_proxy'
-
-  def __init__(self, io_service):
-    super().__init__(io_service)
-
-
-#
-# NotificationProxyConnectWLink
-#
-
-class NotificationProxyConnectWLink(wl.WorkflowLink):
-  def proceed(self):
-    self.data.notification_proxy.connect(self.data.did, self.data.service_port, lambda: self.blocked() or self.next())
-    self.stop_next()
-
-
-#
 # TestBackup
 #
 
@@ -343,7 +322,8 @@ class TestBackup:
   def on_enter(self):
     workflow = wl.WorkflowBatch(
       idevice.DirectoryFindObjectWLink(self.data, did=self.did, sn=self.sn),
-      idevice.ObjectGetAfcWLink(self.data),
+      idevice.ObjectGetAfcServiceWLink(self.data),
+      idevice.ObjectGetNpServiceWLink(self.data),
       wl.ProxyWorkflowLink(lambda: self.on_exit(None)))
     workflow.start()
 

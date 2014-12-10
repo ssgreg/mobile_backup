@@ -9,6 +9,7 @@
 
 import afc
 import lockdown
+import notification_proxy
 import usbmux
 #
 from logger import *
@@ -80,9 +81,19 @@ class DirectoryFindObjectWLink(wl.WorkflowLink):
 # InternalObjectMakeAfcServiceWLink
 #
 
-class ObjectMakeAfcServiceWLink(wl.WorkflowLink):
+class InternalObjectMakeAfcServiceWLink(wl.WorkflowLink):
   def proceed(self):
     self.data.afc = afc.Service(self.data.service_connection)
+    self.next()
+
+
+#
+# InternalObjectMakeNpServiceWLink
+#
+
+class InternalObjectMakeNpServiceWLink(wl.WorkflowLink):
+  def proceed(self):
+    self.data.np = notification_proxy.Service(self.data.service_connection)
     self.next()
 
 
@@ -113,8 +124,18 @@ class Object:
     if not 'afc' in self.data:
       self.workflow = wl.WorkflowBatch(
         lockdown.LockdownStartServiceWLink(self.data, service_type=afc.AFC_SERVICE_TYPE, use_escrow_bag=False),
-        ObjectMakeAfcServiceWLink(self.data),
+        InternalObjectMakeAfcServiceWLink(self.data),
         wl.ProxyWorkflowLink(lambda: on_result(self.data['afc'])))
+      self.workflow.start()
+    else:
+      return on_result(self.data['afc'])
+
+  def np_service(self, on_result):
+    if not 'np' in self.data:
+      self.workflow = wl.WorkflowBatch(
+        lockdown.LockdownStartServiceWLink(self.data, service_type=notification_proxy.SERVICE_TYPE, use_escrow_bag=False),
+        InternalObjectMakeNpServiceWLink(self.data),
+        wl.ProxyWorkflowLink(lambda: on_result(self.data['np'])))
       self.workflow.start()
     else:
       return on_result(self.data['afc'])
@@ -124,6 +145,8 @@ class Object:
       self.data['lockdown'].close()
     if 'afc' in self.data:
       self.data['afc'].close()
+    if 'np' in self.data:
+      self.data['np'].close()
 
 
 #
@@ -140,11 +163,25 @@ class ObjectMakeObjectWLink(wl.WorkflowLink):
 # ObjectGetAfcWLink
 #
 
-class ObjectGetAfcWLink(wl.WorkflowLink):
+class ObjectGetAfcServiceWLink(wl.WorkflowLink):
   def proceed(self):
     self.data.object.afc_service(lambda x: self.blocked() or self.on_afc_service(x))
     self.stop_next()
 
   def on_afc_service(self, afc):
-    self.afc = afc
+    self.data.afc = afc
+    self.next()
+
+
+#
+# ObjectGetNpServiceWLink
+#
+
+class ObjectGetNpServiceWLink(wl.WorkflowLink):
+  def proceed(self):
+    self.data.object.np_service(lambda x: self.blocked() or self.on_np_service(x))
+    self.stop_next()
+
+  def on_np_service(self, np):
+    self.data.np = np
     self.next()
