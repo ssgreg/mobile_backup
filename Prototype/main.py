@@ -16,6 +16,7 @@ import sys
 from io_service import *
 from logger import *
 from tools import *
+import afc
 import device_link
 import idevice
 import lockdown
@@ -323,7 +324,8 @@ class TestBackup:
     workflow = wl.WorkflowBatch(
       idevice.DirectoryFindObjectWLink(self.data, did=self.did, sn=self.sn),
       idevice.ObjectGetAfcServiceWLink(self.data),
-      idevice.ObjectGetNpServiceWLink(self.data),
+#      idevice.ObjectGetNpServiceWLink(self.data),
+      afc.OpenFileWLink(self.data, path='/com.apple.itunes.lock_sync', mode=2),
       wl.ProxyWorkflowLink(lambda: self.on_exit(None)))
     workflow.start()
 
