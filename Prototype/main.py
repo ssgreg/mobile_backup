@@ -326,6 +326,8 @@ class TestBackup:
       idevice.ObjectGetAfcServiceWLink(self.data),
 #      idevice.ObjectGetNpServiceWLink(self.data),
       afc.OpenFileWLink(self.data, path='/com.apple.itunes.lock_sync', mode=2),
+      afc.LockFileWLink(self.data, lock_operation=2),
+      afc.CloseFileWLink(self.data),
       wl.ProxyWorkflowLink(lambda: self.on_exit(None)))
     workflow.start()
 
