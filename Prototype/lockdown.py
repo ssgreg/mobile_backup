@@ -45,6 +45,11 @@ def create_lockdown_message_start_service(service, escrow_bag=None):
     result['EscrowBag'] = escrow_bag
   return result
 
+def create_lockdown_message_get_value():
+  return dict(
+    Label='test',
+    Request='GetValue')
+
 
 #
 # LockdownHeader
@@ -259,6 +264,31 @@ class InternalStartServiceWLink(wl.WorkflowLink):
 
 
 #
+# InternalGetValueWLink
+#
+
+class InternalGetValueWLink(wl.WorkflowLink):
+  def proceed(self):
+    logger().debug('InternalGetValueWLink: Getting value')
+    self.data.session.send(create_lockdown_message_get_value(), lambda x: self.blocked() or self.on_get_value(x))
+    self.stop_next()
+
+  def on_get_value(self, result):
+    if 'Value' in result:
+      logger().debug('InternalGetValueWLink: Done')
+      self.data.get_value_result = result['Value']
+      self.next();
+    else:
+      raise RuntimeError('Failed to get value. Answer is: {0}'.format(result))
+
+
+# connection = connect_to_service(port)
+# session = LockdownSession(connection)
+# self.query_type()
+# self.validate_pair_record()
+# self.start_session()
+
+#
 # LockdownService
 #
 
@@ -266,7 +296,6 @@ class LockdownService:
   def __init__(self, connect_to_service, pair_record, buid, on_result):
     logger().debug('LockdownService: Connecting to lockdown service...')
     self.data = dict(connect_to_service=connect_to_service, pair_record_data=pair_record, buid=buid)
-    #
     self.workflow = wl.WorkflowBatch(
       InternalConnectToServiceWLink(self.data, port=LOCKDOWN_SERVICE_PORT),
       InternalChangeSessionToLockdownWLink(self.data),
@@ -290,6 +319,13 @@ class LockdownService:
       InternalStartServiceWLink(data, service_type=type, use_escrow_bag=use_escrow_bag),
       InternalConnectToServiceWLink(data),
       wl.ProxyWorkflowLink(lambda: on_result(data['connection']))
+    )
+    self.workflow.start()
+
+  def get_value(self, on_result):
+    self.workflow = wl.WorkflowBatch(
+      InternalGetValueWLink(self.data),
+      wl.ProxyWorkflowLink(lambda: on_result(self.data['get_value_result']))
     )
     self.workflow.start()
 
@@ -317,6 +353,21 @@ class LockdownQueryTypeWLink(wl.WorkflowLink):
   def proceed(self):
     self.data.lockdown.query_type(lambda: self.blocked() or self.next())
     self.stop_next()
+
+
+#
+# LockdownGetValueWLink
+#
+
+class LockdownGetValueWLink(wl.WorkflowLink):
+  def proceed(self):
+    self.data.lockdown.get_value(lambda x: self.blocked() or self.on_get_value(x))
+    self.stop_next()
+
+  def on_get_value(self, result):
+    print(str(result).encode('utf-8'))
+    self.data.get_value_result = result
+    self.next()
 
 
 #

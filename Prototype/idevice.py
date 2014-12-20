@@ -109,6 +109,7 @@ class Object:
     self.workflow = wl.WorkflowBatch(
       usbmux.UsbMuxDeviceReadPairRecordWLink(self.data),
       lockdown.LockdownMakeServiceWLink(self.data, buid=self.device.buid),
+      lockdown.LockdownGetValueWLink(self.data),
       wl.ProxyWorkflowLink(on_result))
     self.workflow.start()
 
@@ -119,6 +120,10 @@ class Object:
   @property
   def sn(self):
     return self.device.sn
+
+  @property
+  def value(self):
+    return self.data.get_value_result
 
   def afc_service(self, on_result):
     if not 'afc' in self.data:

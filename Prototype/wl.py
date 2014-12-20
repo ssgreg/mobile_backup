@@ -36,7 +36,7 @@ class WorkflowLink:
     self.__next = next
 
   def blocked(self):
-    return self.__blocked
+    return self.__blocked 
 
   def start(self):
     self.__blocked = False

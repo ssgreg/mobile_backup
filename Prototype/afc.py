@@ -129,6 +129,19 @@ class LockFileWLink(wl.WorkflowLink):
 
 
 #
+# GetFileInfoWLink
+#
+
+class GetFileInfoWLink(wl.WorkflowLink):
+  def proceed(self):
+    self.data.afc.get_file_info(lambda x: self.blocked() or self.on_get_file_info())
+    self.stop_next()
+
+  def on_get_file_info(self):
+    self.next()
+
+
+#
 # CloseFileWLink
 #
 
