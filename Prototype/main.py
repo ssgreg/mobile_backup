@@ -62,7 +62,6 @@ def make_channel():
 #     self.callback = None
 
 
-
 #
 # TestGetDeviceList
 #
@@ -76,16 +75,12 @@ class TestGetDeviceList:
         logger().info('Getting device list...')
         self.usbmux = yield usbmux.Client.connect(make_channel)
         devices = yield self.usbmux.list_devices()
-        self._print_devices(devices)
+        [print(device) for device in devices]
 
     @async.coroutine
     def exit(self):
         if self.usbmux:
             yield self.usbmux.close()
-
-    def _print_devices(self, devices):
-        for i in devices:
-            print(i.display())
 
 
 #
