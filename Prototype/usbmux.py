@@ -10,45 +10,49 @@
 import plistlib
 import struct
 #
-from logger import *
+import logger
 import async
-import wl
 
 
-def create_usbmux_message(command):
+APPLICATION_ID = 'org.acronis.usbmuxd'
+APPLICATION_VERSION = '1.0.0'
+APPLICATION_NAME = 'Acronis Mobile Backup'
+
+
+def create_message(command):
     # kLibUSBMuxVersion = 3 - allows to get notifications about network devices
     return dict(
-        BundleID='org.acronis.usbmuxd',
-        ClientVersionString='1.0.0',
+        BundleID=APPLICATION_ID,
+        ClientVersionString=APPLICATION_VERSION,
         MessageType=command,
-        ProgName='Acronis Mobile Backup',
+        ProgName=APPLICATION_NAME,
         kLibUSBMuxVersion=3)
 
 
-def create_usbmux_message_list_devices():
-    return create_usbmux_message('ListDevices')
+def create_message_list_devices():
+    return create_message('ListDevices')
 
 
-def create_usbmux_message_read_buid():
-    return create_usbmux_message('ReadBUID')
+def create_message_read_buid():
+    return create_message('ReadBUID')
 
 
-def create_usbmux_message_listen():
-    return create_usbmux_message('Listen')
+def create_message_listen():
+    return create_message('Listen')
 
 
-def create_usbmux_message_connect(did, port):
+def create_message_connect(did, port):
     # we should pass the port in the big endian format
     be_port = struct.unpack('>H', struct.pack('@H', port))[0]
     #
-    plist_data = create_usbmux_message('Connect')
+    plist_data = create_message('Connect')
     plist_data['DeviceID'] = did
     plist_data['PortNumber'] = be_port
     return plist_data
 
 
-def create_usbmux_message_read_pair_record(sn):
-    plist_data = create_usbmux_message('ReadPairRecord')
+def create_message_read_pair_record(sn):
+    plist_data = create_message('ReadPairRecord')
     plist_data['PairRecordID'] = sn
     return plist_data
 
@@ -201,43 +205,43 @@ class Client:
 
     @async.coroutine
     def list_devices(self):
-        reply = yield self._session.fetch(create_usbmux_message_list_devices())
+        reply = yield self._session.fetch(create_message_list_devices())
         if 'DeviceList' not in reply:
             raise RuntimeError('Failed to list devices')
         #
         devices = [Device(self, x, self._buid) for x in reply['DeviceList']]
         # remove all non-USB devices
         devices = [x for x in devices if x.connected_via_usb()]
-        logger().info('Visible devices count = {0}'.format(len(devices)))
+        logger.info('Visible devices count = {0}'.format(len(devices)))
         return devices
 
     @async.coroutine
     def read_pair_record(self, sn):
-        logger().info('Reading pair record of a device with a sn = {0}'.format(sn))
-        reply = yield self._session.fetch(create_usbmux_message_read_pair_record(sn))
+        logger.info('Reading pair record of a device with a sn = {0}'.format(sn))
+        reply = yield self._session.fetch(create_message_read_pair_record(sn))
         #
         if 'PairRecordData' not in reply:
             raise RuntimeError('Failed to read pair record')
         pair_record = plistlib.loads(reply['PairRecordData'])
-        logger().info('Done. HostID = {0}'.format(pair_record['HostID']))
+        logger.info('Done. HostID = {0}'.format(pair_record['HostID']))
         return pair_record
 
 
     @async.coroutine
     def connect_to_service(self, did, port):
-        logger().info('Connecting to a service with did = {0} and port = {1}'.format(did, port))
-        reply = yield self._session.fetch(create_usbmux_message_connect(did, port))
+        logger.info('Connecting to a service with did = {0} and port = {1}'.format(did, port))
+        reply = yield self._session.fetch(create_message_connect(did, port))
         #
         if reply['Number'] != 0:
             raise RuntimeError('Failed. Error = {0}'.format(reply['Number']))
-        logger().info('Done')
+        logger.info('Done')
 
 
     @async.coroutine
     def listen(self, on_attached, on_detached=None):
         self._session.on_notification = lambda attached, info:\
             self._on_listen_notification(on_attached, on_detached, attached, info)
-        reply = yield self._session.fetch(create_usbmux_message_listen())
+        reply = yield self._session.fetch(create_message_listen())
         if 'Number' not in reply or reply['Number'] != 0:
             raise RuntimeError('Failed to listen with error: {0}'.format(reply['Number']))
 
@@ -247,12 +251,12 @@ class Client:
 
     @async.coroutine
     def _read_buid(self):
-        reply = yield self._session.fetch(create_usbmux_message_read_buid())
+        reply = yield self._session.fetch(create_message_read_buid())
         if 'BUID' not in reply:
             raise RuntimeError('Failed to read BUID')
         #
         buid = reply['BUID']
-        logger().info('BUID = {0}'.format(buid))
+        logger.info('BUID = {0}'.format(buid))
         return buid
 
     @async.coroutine

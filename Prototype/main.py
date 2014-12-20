@@ -12,7 +12,7 @@ import sys
 import traceback
 #
 from ioloop import *
-from logger import *
+import logger
 from tools import *
 import afc
 import async
@@ -73,7 +73,7 @@ class TestGetDeviceList:
 
     @async.coroutine
     def start(self):
-        logger().info('Getting device list...')
+        logger.info('Getting device list...')
         self.usbmux = yield usbmux.Client.connect(make_channel)
         devices = yield self.usbmux.list_devices()
         [print(device) for device in devices]
@@ -95,7 +95,7 @@ class TestListenForDevices:
 
     @async.coroutine
     def start(self):
-        logger().info('Listen for devices...')
+        logger.info('Listen for devices...')
         self.usbmux = yield usbmux.Client.connect(make_channel)
         yield self.usbmux.listen(self._on_attached, self._on_detached)
 
@@ -380,8 +380,8 @@ def exit_command(future, cmd):
 
 def Main():
     print("Acronis Mobile Backup")
-    configure_logger()
-    logger().info('Current platform: {0}'.format(sys.platform))
+    logger.configure_logger()
+    logger.info('Current platform: {0}'.format(sys.platform))
 
     commands = {
         'list': command_list,

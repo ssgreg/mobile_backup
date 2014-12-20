@@ -16,3 +16,9 @@ def configure_logger():
 
 def logger():
   return logging.getLogger(__name__)
+
+def debug(str):
+  return logger().debug(str)
+
+def info(str):
+  return logger().info(str)
