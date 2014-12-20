@@ -10,8 +10,8 @@
 import plistlib
 import struct
 #
-import logger
 import async
+import logger
 
 
 APPLICATION_ID = 'org.acronis.usbmuxd'
@@ -42,12 +42,12 @@ def create_message_listen():
 
 
 def create_message_connect(did, port):
-    # we should pass the port in the big endian format
-    be_port = struct.unpack('>H', struct.pack('@H', port))[0]
-    #
+    # Note! The port should be passed in a big endian format
     plist_data = create_message('Connect')
-    plist_data['DeviceID'] = did
-    plist_data['PortNumber'] = be_port
+    plist_data.update(
+        DeviceID=did,
+        PortNumber=struct.unpack('>H', struct.pack('@H', port))[0]
+    )
     return plist_data
 
 
