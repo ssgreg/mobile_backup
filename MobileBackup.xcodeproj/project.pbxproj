@@ -78,6 +78,7 @@
 		EE65EFC41A1A4019008BFAF5 /* afc.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = afc.h; sourceTree = "<group>"; };
 		EE65EFC61A1A4081008BFAF5 /* notification_proxy.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = notification_proxy.c; sourceTree = "<group>"; };
 		EE65EFC71A1A4081008BFAF5 /* notification_proxy.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = notification_proxy.h; sourceTree = "<group>"; };
+		EE804CA11A423F3E00F30EA4 /* df */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = df; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -100,6 +101,7 @@
 		EE65EF681A19DCCA008BFAF5 = {
 			isa = PBXGroup;
 			children = (
+				EE804CA11A423F3E00F30EA4 /* df */,
 				EE65EFC11A1A0B6D008BFAF5 /* libcrypto.a */,
 				EE65EFBF1A1A0B45008BFAF5 /* libssl.a */,
 				EE65EFBD1A19F652008BFAF5 /* libusbmuxd.a */,

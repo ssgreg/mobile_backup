@@ -5,21 +5,21 @@
 #include <config.h>
 #endif
 
-#ifndef HAVE_VASPRINTF
-inline int vasprintf(char **PTR, const char *TEMPLATE, va_list AP)
-{
-	int res;
-	char buf[16];
-	res = vsnprintf(buf, 16, TEMPLATE, AP);
-	if (res > 0) {
-		*PTR = (char*)malloc(res+1);
-		res = vsnprintf(*PTR, res+1, TEMPLATE, AP);
-	}
-	return res;
-}
-#endif
+//#ifndef HAVE_VASPRINTF
+//inline int vasprintf(char **PTR, const char *TEMPLATE, va_list AP)
+//{
+//	int res;
+//	char buf[16];
+//	res = vsnprintf(buf, 16, TEMPLATE, AP);
+//	if (res > 0) {
+//		*PTR = (char*)malloc(res+1);
+//		res = vsnprintf(*PTR, res+1, TEMPLATE, AP);
+//	}
+//	return res;
+//}
+//#endif
 
-#ifndef HAVE_ASPRINTF
+//#ifndef HAVE_ASPRINTF
 inline int asprintf(char **PTR, const char *TEMPLATE, ...)
 {
 	int res;
@@ -29,6 +29,6 @@ inline int asprintf(char **PTR, const char *TEMPLATE, ...)
 	va_end(AP);
 	return res;
 }
-#endif
+//#endif
 
 #endif /* ASPRINTF_H */

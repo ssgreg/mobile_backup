@@ -59,7 +59,7 @@
       </BuildableProductRunnable>
       <CommandLineArguments>
          <CommandLineArgument
-            argument = "backup --full &quot;/Users/igreg/Downloads&quot;"
+            argument = "backup --full &quot;/Users/igreg/Downloads&quot; --udid b73fdfc17e123639a21c8ed9d65dcede6253286d"
             isEnabled = "YES">
          </CommandLineArgument>
       </CommandLineArguments>
