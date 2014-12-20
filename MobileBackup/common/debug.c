@@ -39,7 +39,7 @@
 //#include "asprintf.h"
 //#endif
 
-int debug_level = 0;
+int debug_level = 1;
 
 /**
  * Sets the level of debugging. Currently the only acceptable values are 0 and
@@ -93,7 +93,7 @@ void debug_info_real(const char *func, const char *file, int line, const char *f
 
 	/* run the real fprintf */
 	va_start(args, format);
-//	(void)vasprintf(&buffer, format, args);
+	(void)vasprintf(&buffer, format, args);
 	va_end(args);
 
 	debug_print_line(func, file, line, buffer);

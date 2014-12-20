@@ -1509,16 +1509,16 @@ int main(int argc, char *argv[])
   np_client_t np = NULL;
   ldret = lockdownd_start_service(lockdown, NP_SERVICE_NAME, &service);
   if ((ldret == LOCKDOWN_E_SUCCESS) && service && service->port) {
-    np_client_new(device, service, &np);
-    np_set_notify_callback(np, notify_cb, NULL);
-    const char *noties[5] = {
-      NP_SYNC_CANCEL_REQUEST,
-      NP_SYNC_SUSPEND_REQUEST,
-      NP_SYNC_RESUME_REQUEST,
-      NP_BACKUP_DOMAIN_CHANGED,
-      NULL
-    };
-    np_observe_notifications(np, noties);
+//    np_client_new(device, service, &np);
+//    np_set_notify_callback(np, notify_cb, NULL);
+//    const char *noties[5] = {
+//      NP_SYNC_CANCEL_REQUEST,
+//      NP_SYNC_SUSPEND_REQUEST,
+//      NP_SYNC_RESUME_REQUEST,
+//      NP_BACKUP_DOMAIN_CHANGED,
+//      NULL
+//    };
+//    np_observe_notifications(np, noties);
   } else {
     printf("ERROR: Could not start service %s.\n", NP_SERVICE_NAME);
   }
@@ -1590,7 +1590,7 @@ int main(int argc, char *argv[])
     
     uint64_t lockfile = 0;
     if (cmd == CMD_BACKUP) {
-      do_post_notification(device, NP_SYNC_WILL_START);
+//      do_post_notification(device, NP_SYNC_WILL_START);
       afc_file_open(afc, "/com.apple.itunes.lock_sync", AFC_FOPEN_RW, &lockfile);
     }
     if (lockfile) {
