@@ -74,48 +74,6 @@ class UsbMuxHeader:
         size, version, mtype, tag = struct.unpack_from('<IIII', encoded)
         return UsbMuxHeader(size - cls.SIZE, version, mtype, tag)
 
-#
-# UsbMuxInternalReadPairRecordWLink
-#
-
-class UsbMuxInternalReadPairRecordWLink(wl.WorkflowLink):
-    def proceed(self):
-        logger().debug(
-            'UsbMuxInternalReadPairRecordWLink: Reading pair record of a device with a sn = {0}'.format(self.data.sn))
-        self.data.session.send(create_usbmux_message_read_pair_record(self.data.sn),
-                               lambda x: self.blocked() or self.on_get_pair_record(x))
-        self.stop_next()
-
-    def on_get_pair_record(self, result):
-        if 'PairRecordData' in result:
-            self.data.pair_record_data = plistlib.loads(result['PairRecordData'])
-            logger().debug(
-                'UsbMuxInternalReadPairRecordWLink: Done. HostID = {0}'.format(self.data.pair_record_data['HostID']))
-            self.next();
-        else:
-            raise RuntimeError('Failed to read pair record')
-
-
-#
-# UsbMuxInternalConnectToServiceWLink
-#
-
-class UsbMuxInternalConnectToServiceWLink(wl.WorkflowLink):
-    def proceed(self):
-        logger().debug(
-            'UsbMuxInternalConnectToServiceWLink: Connecting to a service, did = {0} port = {1}'.format(self.data.did,
-                                                                                                        self.data.port))
-        self.data.session.send(create_usbmux_message_connect(self.data.did, self.data.port),
-                               lambda x: self.blocked() or self.on_connect(x))
-        self.stop_next()
-
-    def on_connect(self, confirmation):
-        if confirmation['Number'] == 0:
-            logger().debug('UsbMuxInternalConnectToServiceWLink: Done.')
-            self.next();
-        else:
-            raise RuntimeError('Failed to connect with an error = {0}'.format(confirmation['Number']))
-
 
 #
 # Device
@@ -163,35 +121,6 @@ class Device:
 
     def __str__(self):
         return 'Device | did = {0} | sn = {1} | type = {2}'.format(self.did, self.sn, self.connection_type)
-
-
-
-#
-# UsbMuxDeviceConnectToServiceWLink
-#
-
-class UsbMuxDeviceConnectToServiceWLink(wl.WorkflowLink):
-    def proceed(self):
-        self.data.device.connect_to_service(self.data.port, lambda x: self.blocked() or self.on_connect_to_service(x))
-        self.stop_next()
-
-    def on_connect_to_service(self, connection):
-        self.data.service_connection = connection
-        self.next()
-
-
-#
-# UsbMuxDeviceReadPairRecordWLink
-#
-
-class UsbMuxDeviceReadPairRecordWLink(wl.WorkflowLink):
-    def proceed(self):
-        self.data.device.read_pair_record(lambda x: self.blocked() or self.on_read_pair_record(x))
-        self.stop_next()
-
-    def on_read_pair_record(self, pair_record_data):
-        self.data.pair_record_data = pair_record_data
-        self.next()
 
 
 #
@@ -281,6 +210,28 @@ class Client:
         devices = [x for x in devices if x.connected_via_usb()]
         logger().info('Visible devices count = {0}'.format(len(devices)))
         return devices
+
+    @async.coroutine
+    def read_pair_record(self, sn):
+        logger().info('Reading pair record of a device with a sn = {0}'.format(sn))
+        reply = yield self._session.fetch(create_usbmux_message_read_pair_record(sn))
+        #
+        if 'PairRecordData' not in reply:
+            raise RuntimeError('Failed to read pair record')
+        pair_record = plistlib.loads(reply['PairRecordData'])
+        logger().info('Done. HostID = {0}'.format(pair_record['HostID']))
+        return pair_record
+
+
+    @async.coroutine
+    def connect_to_service(self, did, port):
+        logger().info('Connecting to a service with did = {0} and port = {1}'.format(did, port))
+        reply = yield self._session.fetch(create_usbmux_message_connect(did, port))
+        #
+        if reply['Number'] != 0:
+            raise RuntimeError('Failed. Error = {0}'.format(reply['Number']))
+        logger().info('Done')
+
 
     @async.coroutine
     def listen(self, on_attached, on_detached=None):
