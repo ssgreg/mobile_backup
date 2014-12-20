@@ -48,15 +48,15 @@ class Directory:
     def objects(self):
         service = yield self._service_factory()
         devices = yield service.list_devices()
-        return [Object(device) for device in devices]
+        return [Object(device, self._service_factory) for device in devices]
 
     @async.coroutine
     def wait_for_object(self, sn, connection_type=TYPE_USB):
         waiter = DeviceWaiter(sn, connection_type)
-        service = yield self._service_factory()
-        yield service.listen(waiter.on_attached)
-        object = yield waiter.wait()
-        return object
+        with (yield self._service_factory()) as service:
+            yield service.listen(waiter.on_attached)
+            device = yield waiter.wait()
+        return Object(device, self._service_factory)
 
 
 #
@@ -64,8 +64,11 @@ class Directory:
 #
 
 class Object:
-    def __init__(self, device):
+    def __init__(self, device, service_factory):
         self._device = device
 
     def __str__(self):
         return str(self._device)
+
+    def afc_service(self):
+        return None

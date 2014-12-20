@@ -124,7 +124,7 @@ class TestBackup:
     @async.coroutine
     def start(self):
         directory = mb.Directory(self.make_service)
-        object = yield directory.wait_for_object(sn=self.sn, connection_type=mb.TYPE_USB)
+        object = yield directory.wait_for_object(self.sn, connection_type=mb.TYPE_USB)
         print(object)
 
     @async.coroutine
@@ -136,6 +136,8 @@ class TestBackup:
     def make_service(self):
         service = yield usbmux.Client.connect(make_channel)
         return service
+
+
 # #
 # # SessionChangeToCommonService
 # #

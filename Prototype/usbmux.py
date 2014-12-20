@@ -266,3 +266,9 @@ class Client:
             on_attached(Device(self, info, self._buid))
         if not attached and on_detached:
             on_detached(info['DeviceID'])
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, type, value, traceback):
+        self.close()
