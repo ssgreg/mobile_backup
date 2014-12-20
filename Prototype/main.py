@@ -22,6 +22,7 @@ import ioloop
 import lockdown
 import mobilebackup2
 import usbmux
+import mb
 
 
 def make_channel():
@@ -118,21 +119,23 @@ class TestListenForDevices:
 
 class TestBackup:
     def __init__(self, did, sn):
-        self.usbmux = None
         self.sn = sn
 
     @async.coroutine
     def start(self):
-        self.usbmux = yield usbmux.Client.connect(make_channel)
-        record_data = yield self.usbmux.read_pair_record(self.sn)
-        yield self.usbmux.connect_to_service(17, 62078)
+        directory = mb.Directory(self.make_service)
+        object = yield directory.wait_for_object(sn=self.sn, connection_type=mb.TYPE_USB)
+        print(object)
 
     @async.coroutine
     def exit(self):
         if self.usbmux:
-          yield self.usbmux.close()
+            yield self.usbmux.close()
 
-
+    @async.coroutine
+    def make_service(self):
+        service = yield usbmux.Client.connect(make_channel)
+        return service
 # #
 # # SessionChangeToCommonService
 # #
