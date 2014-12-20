@@ -70,5 +70,5 @@ class Object:
     def __str__(self):
         return str(self._device)
 
-    def afc_service(self):
+    def afc_client(self):
         return None

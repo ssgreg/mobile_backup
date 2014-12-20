@@ -14,6 +14,7 @@ import sys
 import time
 #
 import async
+from logger import *
 
 
 #
@@ -87,13 +88,15 @@ class SocketChannel:
         self.on_notification = lambda: None
 
     def connect(self):
-        self._io = socket.socket(self._family, self._type);
+        self._io = socket.socket(self._family, self._type)
         IOLoop.instance().register(self._io, self._on_data, self._on_connect)
         self._io.connect(self._address)
         self._future = async.Future()
+        logger().info('Connecting to \'{0}\' using socket \'{1}\'...'.format(self._address, self._io.fileno()))
         return self._future
 
     def close(self):
+        logger().info('Closing socket \'{0}\'...'.format(self._io.fileno()))
         IOLoop.instance().unregister(self._io)
         self._io.close()
 
