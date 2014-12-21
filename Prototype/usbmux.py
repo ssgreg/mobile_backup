@@ -84,44 +84,37 @@ class UsbMuxHeader:
 #
 
 class Device:
-    def __init__(self, usbmux, info, buid):
-        self.usbmux = usbmux
-        self.__info = info
-        self.__buid = buid
-
-    def connect_to_service(self, port, on_result):
-        self.usbmux.connect_to_service(self.did, port, on_result)
-
-    def read_pair_record(self, on_result):
-        self.usbmux.read_pair_record(self.sn, on_result)
+    def __init__(self, info, buid):
+        self._info = info
+        self._buid = buid
 
     def connected_via_usb(self):
         return self.connection_type == 'USB'
 
     @property
     def buid(self):
-        return self.__buid
+        return self._buid
 
     @property
     def did(self):
-        return self.__info['DeviceID']
+        return self._info['DeviceID']
 
     @property
     def sn(self):
-        return self.__info['Properties']['SerialNumber']
+        return self._info['Properties']['SerialNumber']
 
     @property
     def connection_type(self):
         # USB or Network
-        return self.__info['Properties']['ConnectionType']
+        return self._info['Properties']['ConnectionType']
 
     @property
     def pid(self):
-        return self.__info['Properties']['ProductID'] if 'ProductID' in self.__info['Properties'] else None
+        return self._info['Properties']['ProductID'] if 'ProductID' in self._info['Properties'] else None
 
     @property
     def info(self):
-        return self.__info
+        return self._info
 
     def __str__(self):
         return 'Device | did = {0} | sn = {1} | type = {2}'.format(self.did, self.sn, self.connection_type)
@@ -197,11 +190,20 @@ class Client:
         self._session = InternalSession(channel_factory())
         self._buid = None
 
+    def __enter__(self):
+        return self
+
+    def __exit__(self, type, value, traceback):
+        self.close()
+
     @staticmethod
     @async.coroutine
-    def connect(channel_factory):
-        client = yield Client(channel_factory)._connect()
-        return client
+    def make(channel_factory):
+        return (yield Client(channel_factory)._connect())
+
+    @async.coroutine
+    def close(self):
+        yield self._session.stop()
 
     @async.coroutine
     def list_devices(self):
@@ -209,7 +211,7 @@ class Client:
         if 'DeviceList' not in reply:
             raise RuntimeError('Failed to list devices')
         #
-        devices = [Device(self, x, self._buid) for x in reply['DeviceList']]
+        devices = [Device(x, self._buid) for x in reply['DeviceList']]
         # remove all non-USB devices
         devices = [x for x in devices if x.connected_via_usb()]
         logger.info('Visible devices count = {0}'.format(len(devices)))
@@ -226,16 +228,9 @@ class Client:
         logger.info('Done. HostID = {0}'.format(pair_record['HostID']))
         return pair_record
 
-
     @async.coroutine
     def connect_to_service(self, did, port):
-        logger.info('Connecting to a service with did = {0} and port = {1}'.format(did, port))
-        reply = yield self._session.fetch(create_message_connect(did, port))
-        #
-        if reply['Number'] != 0:
-            raise RuntimeError('Failed. Error = {0}'.format(reply['Number']))
-        logger.info('Done')
-
+        yield self._connect_to_service(did, port)
 
     @async.coroutine
     def listen(self, on_attached, on_detached=None):
@@ -246,8 +241,13 @@ class Client:
             raise RuntimeError('Failed to listen with error: {0}'.format(reply['Number']))
 
     @async.coroutine
-    def close(self):
-        yield self._session.stop()
+    def _connect_to_service(self, did, port):
+        logger.info('Connecting to a service with did = {0} and port = {1}'.format(did, port))
+        reply = yield self._session.fetch(create_message_connect(did, port))
+        #
+        if reply['Number'] != 0:
+            raise RuntimeError('Failed. Error = {0}'.format(reply['Number']))
+        logger.info('Done')
 
     @async.coroutine
     def _read_buid(self):
@@ -267,12 +267,6 @@ class Client:
 
     def _on_listen_notification(self, on_attached, on_detached, attached, info):
         if attached and on_attached:
-            on_attached(Device(self, info, self._buid))
+            on_attached(Device(info, self._buid))
         if not attached and on_detached:
             on_detached(info['DeviceID'])
-
-    def __enter__(self):
-        return self
-
-    def __exit__(self, type, value, traceback):
-        self.close()

@@ -134,7 +134,7 @@ class TestBackup:
 
     @async.coroutine
     def make_service(self):
-        service = yield usbmux.Client.connect(make_channel)
+        service = yield usbmux.Client.make(make_channel)
         return service
 
 
