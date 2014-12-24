@@ -10,13 +10,53 @@
 import plistlib
 import struct
 #
-from logger import *
-from tools import *
+import about
 import async
+import logger
 
 
 LOCKDOWN_SERVICE_PORT = 62078
 LOCKDOWN_SERVICE_TYPE = 'com.apple.mobile.lockdown'
+
+
+def create_message(request):
+    return dict(
+        Label=about.APPLICATION_ID,
+        Request=request
+    )
+
+
+def create_message_query_type():
+    return create_message('QueryType')
+
+
+def create_message_get_value():
+    return create_message('GetValue')
+
+
+def create_message_validate_pair(host_id):
+    msg = create_message('ValidatePair')
+    msg.update(
+        PairRecord=dict(HostID=host_id),
+        ProtocolVersion='2'
+    )
+
+
+def create_message_start_session(host_id, buid):
+    msg = create_message('StartSession')
+    msg.update(
+        HostID=host_id,
+        SystemBUID=buid
+    )
+
+
+def create_message_start_service(service, escrow_bag=None):
+    msg = create_message('StartService')
+    msg.update(Service=service)
+    if escrow_bag:
+        msg.update(EscrowBag=escrow_bag)
+    return msg
+
 
 #
 # Session
@@ -31,8 +71,9 @@ class Session:
 #
 
 class Client:
-    def __init__(self, connection_factory):
-        self._connection_factory = connection_factory
+    def __init__(self, channel_factory):
+        self._channel_factory = channel_factory
+        self._temp = None
 
     def __enter__(self):
         return self
@@ -46,48 +87,23 @@ class Client:
         return (yield Client(connection_factory)._connect())
 
     @async.coroutine
+    def start_service(self, name):
+        return 10
+
+    @async.coroutine
     def close(self):
-        yield self._session.stop()
+        self._temp.close()
+#        yield self._session.stop()
 
     @async.coroutine
     def _connect(self):
-        yield self._session.start()
-        self._buid = yield self._read_buid()
+        self._temp = yield self._channel_factory(LOCKDOWN_SERVICE_PORT)
+#        yield self._session.start()
+#        self._buid = yield self._read_buid()
         return self
 
 
 
-# def create_lockdown_message_query_type():
-#   return dict(Request = 'QueryType')
-#
-# def create_lockdown_message_validate_pair(host_id):
-#   return dict(
-#     Label='test',
-#     PairRecord = dict(HostID = host_id),
-#     Request = 'ValidatePair',
-#     ProtocolVersion = '2')
-#
-# def create_lockdown_message_start_session(host_id, buid):
-#   return dict(
-#     Label='test',
-#     Request='StartSession',
-#     HostID=host_id,
-#     SystemBUID=buid)
-#
-# def create_lockdown_message_start_service(service, escrow_bag=None):
-#   result = dict(
-#     Label='test',
-#     Request='StartService',
-#     Service=service)
-#   if escrow_bag:
-#     result['EscrowBag'] = escrow_bag
-#   return result
-#
-# def create_lockdown_message_get_value():
-#   return dict(
-#     Label='test',
-#     Request='GetValue')
-#
 #
 # #
 # # LockdownHeader

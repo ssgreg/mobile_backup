@@ -39,7 +39,7 @@ class InternalFindDeviceByDidOrSnWLink(wl.WorkflowLink):
 
 
 #
-# Directory
+# UsbMuxDirectory
 #
 
 class Directory:

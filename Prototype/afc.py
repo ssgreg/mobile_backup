@@ -13,6 +13,7 @@ import struct
 from logger import *
 from tools import *
 import wl
+import async
 
 
 AFC_SERVICE_TYPE = 'com.apple.afc'
@@ -444,3 +445,36 @@ class ResultPacket:
   def decode(self, encoded):
     param,  = struct.unpack_from('<Q', encoded)
     return ResultPacket(param)
+
+
+class Client:
+    def __init__(self, channel_factory):
+        self._channel_factory = channel_factory
+        self._temp = None
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, type, value, traceback):
+        self.close()
+
+    @staticmethod
+    @async.coroutine
+    def make(connection_factory):
+        return (yield Client(connection_factory)._connect())
+
+    @async.coroutine
+    def start_service(name):
+        return None
+
+    @async.coroutine
+    def close(self):
+        self._temp.close()
+#        yield self._session.stop()
+
+    @async.coroutine
+    def _connect(self):
+        self._temp = yield self._channel_factory(AFC_SERVICE_TYPE)
+#        yield self._session.start()
+#        self._buid = yield self._read_buid()
+        return self

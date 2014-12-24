@@ -10,22 +10,18 @@
 import plistlib
 import struct
 #
+import about
 import async
-import logger
-
-
-APPLICATION_ID = 'org.acronis.usbmuxd'
-APPLICATION_VERSION = '1.0.0'
-APPLICATION_NAME = 'Acronis Mobile Backup'
+from logger import app_log
 
 
 def create_message(command):
     # kLibUSBMuxVersion = 3 - allows to get notifications about network devices
     return dict(
-        BundleID=APPLICATION_ID,
-        ClientVersionString=APPLICATION_VERSION,
+        BundleID=about.APPLICATION_ID,
+        ClientVersionString=about.APPLICATION_VERSION,
         MessageType=command,
-        ProgName=APPLICATION_NAME,
+        ProgName=about.APPLICATION_NAME,
         kLibUSBMuxVersion=3)
 
 
@@ -84,16 +80,11 @@ class UsbMuxHeader:
 #
 
 class Device:
-    def __init__(self, info, buid):
+    def __init__(self, info):
         self._info = info
-        self._buid = buid
 
     def connected_via_usb(self):
         return self.connection_type == 'USB'
-
-    @property
-    def buid(self):
-        return self._buid
 
     @property
     def did(self):
@@ -138,7 +129,7 @@ class InternalSession:
 
     @async.coroutine
     def start(self):
-        yield self._channel.connect()
+        yield self._channel.connect_async()
 
     @async.coroutine
     def fetch(self, msg):
@@ -157,6 +148,10 @@ class InternalSession:
     def stop(self):
         yield self._channel.close()
 
+    def release_channel(self):
+        channel, self._channel = self._channel, None
+        return channel
+
     def _validate_header(self, header, tag):
         if header.tag != tag:
             raise RuntimeError('Incorrect usbmux header tag!')
@@ -169,10 +164,10 @@ class InternalSession:
 
     @async.coroutine
     def _read_message(self, tag):
-        reply_header_data = yield self._channel.read(UsbMuxHeader.SIZE)
+        reply_header_data = yield self._channel.read_async(UsbMuxHeader.SIZE)
         reply_header = UsbMuxHeader.decode(reply_header_data)
         self._validate_header(reply_header, tag)
-        reply_data = yield self._channel.read(reply_header.size)
+        reply_data = yield self._channel.read_async(reply_header.size)
         return plistlib.loads(reply_data)
 
     @async.coroutine
@@ -187,8 +182,8 @@ class InternalSession:
 
 class Client:
     def __init__(self, channel_factory):
+        self._channel_factory = channel_factory
         self._session = InternalSession(channel_factory())
-        self._buid = None
 
     def __enter__(self):
         return self
@@ -202,6 +197,11 @@ class Client:
         return (yield Client(channel_factory)._connect())
 
     @async.coroutine
+    def connect_to_device_service(self, did, port):
+        with (yield Client.make(self._channel_factory)) as client:
+            return (yield client.turn_to_tunnel_to_device_service(did, port))
+
+    @async.coroutine
     def close(self):
         yield self._session.stop()
 
@@ -211,26 +211,22 @@ class Client:
         if 'DeviceList' not in reply:
             raise RuntimeError('Failed to list devices')
         #
-        devices = [Device(x, self._buid) for x in reply['DeviceList']]
+        devices = [Device(x) for x in reply['DeviceList']]
         # remove all non-USB devices
         devices = [x for x in devices if x.connected_via_usb()]
-        logger.info('Visible devices count = {0}'.format(len(devices)))
+        app_log.info('Visible devices count = {0}'.format(len(devices)))
         return devices
 
     @async.coroutine
     def read_pair_record(self, sn):
-        logger.info('Reading pair record of a device with a sn = {0}'.format(sn))
+        app_log.info('Reading pair record of a device with a sn = {0}'.format(sn))
         reply = yield self._session.fetch(create_message_read_pair_record(sn))
         #
         if 'PairRecordData' not in reply:
             raise RuntimeError('Failed to read pair record')
         pair_record = plistlib.loads(reply['PairRecordData'])
-        logger.info('Done. HostID = {0}'.format(pair_record['HostID']))
+        app_log.info('Done. HostID = {0}'.format(pair_record['HostID']))
         return pair_record
-
-    @async.coroutine
-    def connect_to_service(self, did, port):
-        yield self._connect_to_service(did, port)
 
     @async.coroutine
     def listen(self, on_attached, on_detached=None):
@@ -241,32 +237,33 @@ class Client:
             raise RuntimeError('Failed to listen with error: {0}'.format(reply['Number']))
 
     @async.coroutine
-    def _connect_to_service(self, did, port):
-        logger.info('Connecting to a service with did = {0} and port = {1}'.format(did, port))
+    def turn_to_tunnel_to_device_service(self, did, port):
+        app_log.info('Connecting to a service with did = {0} and port = {1}'.format(did, port))
         reply = yield self._session.fetch(create_message_connect(did, port))
         #
         if reply['Number'] != 0:
             raise RuntimeError('Failed. Error = {0}'.format(reply['Number']))
-        logger.info('Done')
+        app_log.info('Done')
+        return self._session.release_channel()
 
     @async.coroutine
-    def _read_buid(self):
+    def read_buid(self):
         reply = yield self._session.fetch(create_message_read_buid())
         if 'BUID' not in reply:
             raise RuntimeError('Failed to read BUID')
         #
         buid = reply['BUID']
-        logger.info('BUID = {0}'.format(buid))
+        app_log.info('BUID = {0}'.format(buid))
+        print('buid', app_log)
         return buid
 
     @async.coroutine
     def _connect(self):
         yield self._session.start()
-        self._buid = yield self._read_buid()
         return self
 
     def _on_listen_notification(self, on_attached, on_detached, attached, info):
         if attached and on_attached:
-            on_attached(Device(info, self._buid))
+            on_attached(Device(info))
         if not attached and on_detached:
             on_detached(info['DeviceID'])

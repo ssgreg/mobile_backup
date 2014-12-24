@@ -12,9 +12,10 @@ import sys
 import traceback
 #
 from ioloop import *
-import logger
+from logger import app_log, enable_pretty_logging
 from tools import *
 import afc
+import logging
 import async
 import device_link
 import idevice
@@ -73,7 +74,7 @@ class TestGetDeviceList:
 
     @async.coroutine
     def start(self):
-        logger.info('Getting device list...')
+#        logger.info('Getting device list...')
         self.usbmux = yield usbmux.Client.connect(make_channel)
         devices = yield self.usbmux.list_devices()
         [print(device) for device in devices]
@@ -95,8 +96,8 @@ class TestListenForDevices:
 
     @async.coroutine
     def start(self):
-        logger.info('Listen for devices...')
-        self.usbmux = yield usbmux.Client.connect(make_channel)
+#        logger.info('Listen for devices...')
+        self.usbmux = yield usbmux.Client.make(make_channel)
         yield self.usbmux.listen(self._on_attached, self._on_detached)
 
     @async.coroutine
@@ -123,20 +124,16 @@ class TestBackup:
 
     @async.coroutine
     def start(self):
-        directory = mb.Directory(self.make_service)
+        directory = yield mb.UsbMuxDirectory.make(make_channel)
         object = yield directory.wait_for_object(self.sn, connection_type=mb.TYPE_USB)
+        with (yield object.afc_client()) as afc_client:
+            print(afc_client)
         print(object)
 
     @async.coroutine
     def exit(self):
         if self.usbmux:
             yield self.usbmux.close()
-
-    @async.coroutine
-    def make_service(self):
-        service = yield usbmux.Client.make(make_channel)
-        return service
-
 
 # #
 # # SessionChangeToCommonService
@@ -314,7 +311,7 @@ class TestBackup:
 #     self.io_service = SafeIOService(io_service, self.on_exit)
 #     self.did = did
 #     self.sn = sn
-#     self.directory = idevice.Directory(lambda: Connection(self.io_service, connect()))
+#     self.directory = idevice.UsbMuxDirectory(lambda: Connection(self.io_service, connect()))
 #     self.data = dict(directory=self.directory)
 
 #   def start(self):
@@ -380,8 +377,8 @@ def exit_command(future, cmd):
 
 def Main():
     print("Acronis Mobile Backup")
-    logger.configure_logger()
-    logger.info('Current platform: {0}'.format(sys.platform))
+    enable_pretty_logging(logging.DEBUG)
+    app_log.info('Current platform: {0}'.format(sys.platform))
 
     commands = {
         'list': command_list,
@@ -393,7 +390,6 @@ def Main():
     cmd = commands[args.command](args)
     cmd.start().add_done_callback(lambda f: exit_command(f, cmd))
     IOLoop.instance().start()
-
 
 
 # from wakeonlan import wol
