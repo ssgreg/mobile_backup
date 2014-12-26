@@ -12,7 +12,8 @@ import struct
 #
 import about
 import async
-import logger
+from logger import app_log
+from tools import log_extra
 
 
 LOCKDOWN_SERVICE_PORT = 62078
@@ -83,8 +84,12 @@ class Client:
 
     @staticmethod
     @async.coroutine
-    def make(connection_factory):
-        return (yield Client(connection_factory)._connect())
+    def make(channel_factory):
+        client = Client(channel_factory);
+        app_log.debug('Making a lockdown.Client...', **log_extra(client))
+        yield client._connect()
+        app_log.info('A lockdown.Client object is created', **log_extra(client))
+        return client
 
     @async.coroutine
     def start_service(self, name):

@@ -17,7 +17,7 @@ import sys
 #
 
 class LogFormatter(logging.Formatter):
-    DEFAULT_FORMAT = '%(color)s[%(levelname)1.1s %(asctime)s %(module)s:%(lineno)d]%(end_color)s %(message)s'
+    DEFAULT_FORMAT = '%(color)s[%(levelname)1.1s %(asctime)s %(module)s.%(classname)s%(funcName)s:%(lineno)d]%(end_color)s %(message)s'
     DEFAULT_DATE_FORMAT = '%y%m%d-%H%M%S'
     DEFAULT_ENDC = '\033[0m'
     DEFAULT_COLORS = {
@@ -46,8 +46,17 @@ class LogFormatter(logging.Formatter):
             record.end_color = self._normal
         else:
             record.color = record.end_color = ''
+
+        data = dict(record.__dict__)
+        if not 'classname' in data:
+            data['classname'] = ''
+        else:
+            if 'classid' in data:
+                data['classname'] += '(' + data['classid'] + ')'
+            data['classname'] += '.'
+
         # format string
-        formatted = self._fmt % record.__dict__
+        formatted = self._fmt % data
         # format exception
         if record.exc_info:
             if not record.exc_text:

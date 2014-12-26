@@ -124,10 +124,10 @@ class TestBackup:
 
     @async.coroutine
     def start(self):
-        directory = yield mb.UsbMuxDirectory.make(make_channel)
-        object = yield directory.wait_for_object(self.sn, connection_type=mb.TYPE_USB)
-        with (yield object.afc_client()) as afc_client:
-            print(afc_client)
+        with (yield mb.UsbMuxDirectory.make(make_channel)) as directory:
+            object = yield directory.wait_for_object(self.sn, connection_type=mb.TYPE_USB)
+            with (yield object.afc_client()) as afc_client:
+                print(afc_client)
         print(object)
 
     @async.coroutine

@@ -13,6 +13,7 @@ import async
 import lockdown
 import usbmux
 from logger import app_log
+from tools import log_extra
 
 
 TYPE_NETWORK = 'Network'
@@ -50,43 +51,65 @@ class UsbMuxDirectory:
         self._usbmux_client = None
         self._buid = None
 
+    def __enter__(self):
+        return self
+
+    def __exit__(self, type, value, traceback):
+        self.close()
+
+    def close(self):
+        not self._usbmux_client or self._usbmux_client.close()
+
     @staticmethod
     @async.coroutine
     def make(channel_factory):
-        app_log.info('Making UsbMuxDirectory...')
         directory = UsbMuxDirectory(channel_factory)
+        app_log.info('Making a UsbMuxDirectory...', **log_extra(directory))
         directory._usbmux_client = yield directory._make_usbmux_client()
         directory._buid = yield directory._usbmux_client.read_buid()
+        app_log.debug('A UsbMuxDirectory is created.', **log_extra(directory))
         return directory
 
     @async.coroutine
     def objects(self):
         with (yield self._make_usbmux_client()) as service:
             devices = yield service.list_devices()
-        return [Object(device, self._usbmux_client) for device in devices]
+        return [(yield self._make_object(device)) for device in devices]
 
     @async.coroutine
     def wait_for_object(self, sn, connection_type=TYPE_USB):
+        app_log.debug('Waiting for an object with sn={0}, type={1}'.format(sn, connection_type), **log_extra(self))
         waiter = DeviceWaiter(sn, connection_type)
         with (yield self._make_usbmux_client()) as service:
-#            print((yield service.read_pair_record()))
-            yield service.listen(waiter.on_attached)
+            yield service.turn_to_listen_channel(waiter.on_attached)
             device = yield waiter.wait()
-        return Object(device, self._usbmux_client)
+        app_log.info('Done. Object={0}'.format(device), **log_extra(self))
+        return (yield self._make_object(device))
 
     @async.coroutine
     def _make_usbmux_client(self):
         service = yield usbmux.Client.make(self._channel_factory)
         return service
 
+    @async.coroutine
+    def _make_object(self, device):
+        pair_record = yield self._usbmux_client.read_pair_record(device.sn)
+        return Object(device, self._buid, pair_record, self._make_channel_to_port)
+
+    @async.coroutine
+    def _make_channel_to_port(self, did, port):
+        with (yield self._make_usbmux_client()) as service:
+            return (yield service.turn_to_tunnel_to_device_service(did, port))
+
+
 #
 # Object
 #
 
 class Object:
-    def __init__(self, device, usbmux_factory):
+    def __init__(self, device, buid, pair_record, channel_factory):
         self._device = device
-        self._usbmux_factory = usbmux_factory
+        self._channel_factory = channel_factory
 
     def __str__(self):
         return str(self._device)
@@ -97,8 +120,7 @@ class Object:
 
     @async.coroutine
     def _make_channel_to_port(self, port):
-        with (yield self._usbmux_factory()) as usbmux_client:
-            return (yield usbmux_client.turn_to_tunnel_to_device_service(self.did, port))
+        return (yield self._channel_factory(self.did, port))
 
     @async.coroutine
     def _make_channel_to_device_service(self, name):

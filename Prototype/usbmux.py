@@ -13,6 +13,7 @@ import struct
 import about
 import async
 from logger import app_log
+from tools import log_extra, log_extra_cls
 
 
 def create_message(command):
@@ -108,7 +109,7 @@ class Device:
         return self._info
 
     def __str__(self):
-        return 'Device | did = {0} | sn = {1} | type = {2}'.format(self.did, self.sn, self.connection_type)
+        return '<Device: did={0} | sn={1} | type={2}>'.format(self.did, self.sn, self.connection_type)
 
 
 #
@@ -175,6 +176,9 @@ class InternalSession:
         message = yield self._read_message(self.TAG_NOTIFICATION)
         self.on_notification(message['MessageType'] == 'Attached', message)
 
+    @property
+    def id(self):
+        return self._channel.id
 
 #
 # Client
@@ -194,7 +198,11 @@ class Client:
     @staticmethod
     @async.coroutine
     def make(channel_factory):
-        return (yield Client(channel_factory)._connect())
+        client = Client(channel_factory)
+        app_log.debug('Making a usbmux.Client...', **log_extra(client))
+        yield client._connect()
+        app_log.info('A usbmux.Client object is created', **log_extra(client))
+        return client
 
     @async.coroutine
     def connect_to_device_service(self, did, port):
@@ -214,22 +222,23 @@ class Client:
         devices = [Device(x) for x in reply['DeviceList']]
         # remove all non-USB devices
         devices = [x for x in devices if x.connected_via_usb()]
-        app_log.info('Visible devices count = {0}'.format(len(devices)))
+        app_log.info('Visible devices count = {0}'.format(len(devices)), **log_extra(self))
         return devices
 
     @async.coroutine
     def read_pair_record(self, sn):
-        app_log.info('Reading pair record of a device with a sn = {0}'.format(sn))
+        app_log.debug('Reading pair record with sn={0}...'.format(sn), **log_extra(self))
         reply = yield self._session.fetch(create_message_read_pair_record(sn))
         #
         if 'PairRecordData' not in reply:
             raise RuntimeError('Failed to read pair record')
         pair_record = plistlib.loads(reply['PairRecordData'])
-        app_log.info('Done. HostID = {0}'.format(pair_record['HostID']))
+        app_log.info('Done. HostID={0}'.format(pair_record['HostID']), **log_extra(self))
         return pair_record
 
     @async.coroutine
-    def listen(self, on_attached, on_detached=None):
+    def turn_to_listen_channel(self, on_attached, on_detached=None):
+        app_log.info('Turning to a listen channel...', **log_extra(self))
         self._session.on_notification = lambda attached, info:\
             self._on_listen_notification(on_attached, on_detached, attached, info)
         reply = yield self._session.fetch(create_message_listen())
@@ -238,23 +247,23 @@ class Client:
 
     @async.coroutine
     def turn_to_tunnel_to_device_service(self, did, port):
-        app_log.info('Connecting to a service with did = {0} and port = {1}'.format(did, port))
+        app_log.debug('Turning to a tunnel to a device service with did = {0}, port = {1}'.format(did, port), **log_extra(self))
         reply = yield self._session.fetch(create_message_connect(did, port))
         #
         if reply['Number'] != 0:
             raise RuntimeError('Failed. Error = {0}'.format(reply['Number']))
-        app_log.info('Done')
+        app_log.info('Turned to a tunnel to device service', **log_extra(self))
         return self._session.release_channel()
 
     @async.coroutine
     def read_buid(self):
+        app_log.debug('Reading BUID...', **log_extra(self))
         reply = yield self._session.fetch(create_message_read_buid())
         if 'BUID' not in reply:
             raise RuntimeError('Failed to read BUID')
         #
         buid = reply['BUID']
-        app_log.info('BUID = {0}'.format(buid))
-        print('buid', app_log)
+        app_log.info('Done. BUID={0}'.format(buid), **log_extra(self))
         return buid
 
     @async.coroutine
@@ -264,6 +273,10 @@ class Client:
 
     def _on_listen_notification(self, on_attached, on_detached, attached, info):
         if attached and on_attached:
-            on_attached(Device(info))
+            device = Device(info)
+            app_log.debug('Attached: {0}'.format(device), **log_extra(self))
+            on_attached(device)
         if not attached and on_detached:
-            on_detached(info['DeviceID'])
+            did = info['DeviceID']
+            app_log.debug('Detached: did = {0}'.format(did), **log_extra(self))
+            on_detached(did)

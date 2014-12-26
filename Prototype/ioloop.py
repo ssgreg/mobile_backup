@@ -15,6 +15,7 @@ import time
 #
 import async
 from logger import app_log
+from tools import log_extra
 
 
 #
@@ -92,11 +93,11 @@ class SocketChannel:
         IOLoop.instance().register(self._io, self._on_data, self._on_connect)
         self._io.connect(self._address)
         self._future = async.Future()
-        app_log.info('Connecting to \'{0}\' using socket \'{1}\'...'.format(self._address, self._io.fileno()))
+        app_log.debug('Connecting to \'{0}\' using socket \'{1}\'...'.format(self._address, self.id), **log_extra(self))
         return self._future
 
     def close(self):
-        app_log.info('Closing socket \'{0}\'...'.format(self._io.fileno()))
+        app_log.debug('Closing socket \'{0}\'...'.format(self.id), **log_extra(self))
         IOLoop.instance().unregister(self._io)
         self._io.close()
 
@@ -131,3 +132,7 @@ class SocketChannel:
         if not self._future:
             raise RuntimeError('SocketChannel: Future does not set')
         self._future.set_result(True)
+
+    @property
+    def id(self):
+        return self._io.fileno()
