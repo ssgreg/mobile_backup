@@ -57,8 +57,10 @@ class UsbMuxDirectory:
     def __exit__(self, type, value, traceback):
         self.close()
 
+    @async.coroutine
     def close(self):
-        not self._usbmux_client or self._usbmux_client.close()
+        not self._usbmux_client or (self._usbmux_client.close())
+        app_log.info('Closed', **log_extra(self))
 
     @staticmethod
     @async.coroutine
@@ -66,6 +68,7 @@ class UsbMuxDirectory:
         directory = UsbMuxDirectory(channel_factory)
         app_log.info('Making a UsbMuxDirectory...', **log_extra(directory))
         directory._usbmux_client = yield directory._make_usbmux_client()
+#        raise RuntimeError('test')
         directory._buid = yield directory._usbmux_client.read_buid()
         app_log.debug('A UsbMuxDirectory is created.', **log_extra(directory))
         return directory
@@ -108,6 +111,8 @@ class UsbMuxDirectory:
 
 class Object:
     def __init__(self, device, buid, pair_record, channel_factory):
+        self._buid = buid
+        self._pair_record = pair_record
         self._device = device
         self._channel_factory = channel_factory
 
@@ -124,7 +129,7 @@ class Object:
 
     @async.coroutine
     def _make_channel_to_device_service(self, name):
-        with (yield lockdown.Client.make(self._make_channel_to_port)) as lockdown_client:
+        with (yield lockdown.Client.make(self._pair_record, self._buid, self._make_channel_to_port)) as lockdown_client:
             port = yield lockdown_client.start_service(name)
             return (yield self._make_channel_to_port(port))
 

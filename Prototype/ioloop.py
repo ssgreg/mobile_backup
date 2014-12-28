@@ -7,10 +7,13 @@
 #  Copyright (c) 2014 Grigory Zubankov. All rights reserved.
 #
 
+import os
 import sched
 import select
 import socket
+import ssl
 import sys
+import tempfile
 import time
 #
 import async
@@ -45,7 +48,7 @@ class IOLoop:
                 break
             self._process_io()
 
-    def register(self, io, read_callback, connect_callback):
+    def register(self, io, read_callback, connect_callback=None):
         self._ios.append(io)
         self._cios.append(io)
         self._hs[io] = (read_callback, connect_callback)
@@ -63,7 +66,8 @@ class IOLoop:
             rios, wios, eios = select.select(self._ios, self._cios, [], timeout)
             for io in wios:
                 self._filter_obj(self._cios, io)
-                self._hs[io][1]()
+                if self._hs[io][1]:
+                    self._hs[io][1]()
             for io in rios:
                 self._hs[io][0]()
         else:
@@ -136,3 +140,26 @@ class SocketChannel:
     @property
     def id(self):
         return self._io.fileno()
+
+    def enable_ssl(self, cert, key):
+        app_log.debug('Trying to enable SSL for socket \'{0}\'....'.format(self.id), **log_extra(self))
+        cert_file = tempfile.NamedTemporaryFile(delete=False) if cert else None
+        key_file = tempfile.NamedTemporaryFile(delete=False) if key else None
+        try:
+            if cert:
+                cert_file.write(cert)
+                cert_file.close()
+                cert_file = cert_file.name
+            if key:
+                key_file.write(key)
+                key_file.close()
+                key_file = key_file.name
+            IOLoop.instance().unregister(self._io)
+            self._io = ssl.wrap_socket(self._io, certfile=cert_file, keyfile=key_file, ssl_version=3)
+            IOLoop.instance().register(self._io, self._on_data)
+        finally:
+            if cert:
+                os.remove(cert_file)
+            if key:
+                os.remove(key_file)
+            app_log.info('SSL has been enabled for socket \'{0}\''.format(self.id), **log_extra(self))

@@ -69,20 +69,12 @@ def make_channel():
 #
 
 class TestGetDeviceList:
-    def __init__(self):
-        self.usbmux = None
-
     @async.coroutine
     def start(self):
-#        logger.info('Getting device list...')
-        self.usbmux = yield usbmux.Client.connect(make_channel)
-        devices = yield self.usbmux.list_devices()
+        usbmux_client = yield usbmux.Client.connect(make_channel)
+        devices = yield self.usbmux_client.list_devices()
         [print(device) for device in devices]
-
-    @async.coroutine
-    def exit(self):
-        if self.usbmux:
-            yield self.usbmux.close()
+        usbmux_client.close()
 
 
 #
@@ -96,13 +88,8 @@ class TestListenForDevices:
 
     @async.coroutine
     def start(self):
-#        logger.info('Listen for devices...')
         self.usbmux = yield usbmux.Client.make(make_channel)
         yield self.usbmux.listen(self._on_attached, self._on_detached)
-
-    @async.coroutine
-    def exit(self):
-        pass
 
     def _on_attached(self, device):
         print('Attached:', device)
@@ -128,12 +115,8 @@ class TestBackup:
             object = yield directory.wait_for_object(self.sn, connection_type=mb.TYPE_USB)
             with (yield object.afc_client()) as afc_client:
                 print(afc_client)
-        print(object)
+            print(object)
 
-    @async.coroutine
-    def exit(self):
-        if self.usbmux:
-            yield self.usbmux.close()
 
 # #
 # # SessionChangeToCommonService
@@ -372,10 +355,9 @@ def exit_command(future, cmd):
         future.result()
     except Exception:
         print(traceback.format_exc())
-    cmd.exit()
 
 
-def Main():
+def main():
     print("Acronis Mobile Backup")
     enable_pretty_logging(logging.DEBUG)
     app_log.info('Current platform: {0}'.format(sys.platform))
@@ -395,4 +377,4 @@ def Main():
 # from wakeonlan import wol
 # wol.send_magic_packet('28.E1.4C.CB.C4.22')
 
-Main()
+main()

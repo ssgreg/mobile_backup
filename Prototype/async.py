@@ -132,28 +132,28 @@ class MyRunner:
 #
 
 def coroutine(func):
-  def wrapper(*args, **kwargs):
-    future = Future()
-    try:
-      result = func(*args, **kwargs)
-    except StopIteration as e:
-      result = getattr(e, 'value', None)
-    except Exception:
-      future.set_exc_info(sys.exc_info())
-      return future
-    else:
-      if isinstance(result, types.GeneratorType):
+    def wrapper(*args, **kwargs):
+        future = Future()
         try:
-          yielded = next(result)
+            result = func(*args, **kwargs)
         except StopIteration as e:
-            future.set_result(getattr(e, 'value', None))
+            result = getattr(e, 'value', None)
         except Exception:
             future.set_exc_info(sys.exc_info())
+            return future
         else:
-          MyRunner(result, future, yielded)
+            if isinstance(result, types.GeneratorType):
+                try:
+                    yielded = next(result)
+                except StopIteration as e:
+                    future.set_result(getattr(e, 'value', None))
+                except Exception:
+                    future.set_exc_info(sys.exc_info())
+                else:
+                    MyRunner(result, future, yielded)
+                return future
+        #
+        future.set_result(result)
         return future
-    #
-    future.set_result(result)
-    return future
-  return wrapper
+    return wrapper
 

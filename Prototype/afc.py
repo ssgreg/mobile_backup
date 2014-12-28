@@ -460,14 +460,17 @@ class Client:
 
     @staticmethod
     @async.coroutine
-    def make(connection_factory):
-        return (yield Client(connection_factory)._connect())
+    def make(channel_factory):
+        client = Client(channel_factory)
+        app_log.debug('Making a afc.Client...', **log_extra(client))
+        yield client._connect()
+        app_log.info('An afc.Client object is created', **log_extra(client))
+        return client
 
     @async.coroutine
     def start_service(name):
         return None
 
-    @async.coroutine
     def close(self):
         self._temp.close()
 #        yield self._session.stop()

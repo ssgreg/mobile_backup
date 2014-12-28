@@ -145,9 +145,8 @@ class InternalSession:
         self._tag += 1
         return message
 
-    @async.coroutine
     def stop(self):
-        yield self._channel.close()
+        not self._channel or self._channel.close()
 
     def release_channel(self):
         channel, self._channel = self._channel, None
@@ -176,9 +175,6 @@ class InternalSession:
         message = yield self._read_message(self.TAG_NOTIFICATION)
         self.on_notification(message['MessageType'] == 'Attached', message)
 
-    @property
-    def id(self):
-        return self._channel.id
 
 #
 # Client
@@ -209,9 +205,9 @@ class Client:
         with (yield Client.make(self._channel_factory)) as client:
             return (yield client.turn_to_tunnel_to_device_service(did, port))
 
-    @async.coroutine
     def close(self):
-        yield self._session.stop()
+        self._session.stop()
+        app_log.info('Closed', **log_extra(self))
 
     @async.coroutine
     def list_devices(self):
@@ -269,7 +265,6 @@ class Client:
     @async.coroutine
     def _connect(self):
         yield self._session.start()
-        return self
 
     def _on_listen_notification(self, on_attached, on_detached, attached, info):
         if attached and on_attached:
