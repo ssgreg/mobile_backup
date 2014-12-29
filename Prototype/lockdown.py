@@ -31,8 +31,13 @@ def create_message_query_type():
     return create_message('QueryType')
 
 
-def create_message_get_value():
-    return create_message('GetValue')
+def create_message_get_value(domain=None, key=None):
+    msg = create_message('GetValue')
+    if domain:
+        msg.update(Domain=domain)
+    if key:
+        msg.update(Key=key)
+    return msg
 
 
 def create_message_validate_pair(host_id):
