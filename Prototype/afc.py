@@ -8,7 +8,6 @@
 #
 
 
-import plistlib
 import struct
 #
 import async
@@ -338,6 +337,7 @@ class InternalSession:
     def __init__(self, channel_factory):
         self._channel_factory = channel_factory
         self._channel = None
+        self._index = 0
 
     @async.coroutine
     def start(self):
@@ -348,29 +348,39 @@ class InternalSession:
             self._channel.close()
 
     @async.coroutine
-    def fetch(self, data, payload):
-        if 'Request' not in msg:
-            raise RuntimeError('Passed msg does not contain a \'Request\' field.')
+    def fetch(self, op, data=None, payload=None):
+        header = Header(len(data) if data else 0, len(payload) if payload else 0, op, self._index)
+        header_data = header.encode()
         #
-        request_data = plistlib.dumps(msg)
-        request_header_data = LockdownHeader(len(request_data)).encode()
+        self._channel.write(header_data)
+        if data:
+            self._channel.write(data)
+        if payload:
+            self._channel.write(payload)
         #
-        self._channel.write(request_header_data)
-        self._channel.write(request_data)
-        #
-        return (yield self._read_message())
+        self._index += 1
+        return (yield self._read_message(header))
 
-    def _validate_header(self, header):
+    def _validate_header(self, header, original_header):
+        if header.index != original_header.index:
+            raise RuntimeError('Damaged AFC header!')
         if header.size > self.MAX_REPLY_SIZE:
-            raise RuntimeError('Lockdown header size is too big!')
+            raise RuntimeError('AFC data size is too big!')
+        if header.payload_size > self.MAX_REPLY_SIZE:
+            raise RuntimeError('AFC payload size is too big!')
 
     @async.coroutine
-    def _read_message(self):
-        reply_header_data = yield self._channel.read_async(LockdownHeader.SIZE)
-        reply_header = LockdownHeader.decode(reply_header_data)
-        self._validate_header(reply_header)
-        reply_data = yield self._channel.read_async(reply_header.size)
-        return plistlib.loads(reply_data)
+    def _read_message(self, original_header):
+        header_data = yield self._channel.read_async(Header.SIZE)
+        header = Header.decode(header_data)
+        self._validate_header(header, original_header)
+        data = None
+        if header.size:
+            data = yield self._channel.read_async(header.size)
+        payload = None
+        if header.payload_size:
+            payload = yield self._channel.read_async(header.payload_size)
+        return header.operation, data, payload
 
     def enable_ssl(self, cert, key):
         self._channel.enable_ssl(cert, key)
@@ -383,7 +393,7 @@ class InternalSession:
 class Client:
     def __init__(self, channel_factory):
         self._channel_factory = channel_factory
-        self._temp = None
+        self._session = InternalSession(channel_factory)
 
     def __enter__(self):
         return self
@@ -401,15 +411,12 @@ class Client:
     @async.coroutine
     def connect(self):
         app_log.debug('Connecting to an AFC service...', **log_extra(self))
-        self._temp = yield self._channel_factory(AFC_SERVICE_TYPE)
+        yield self._session.start()
         app_log.info('Connected to an AFC service...', **log_extra(self))
-        #        yield self._session.start()
         return self
 
     def close(self):
-        self._temp.close()
-
-    #        yield self._session.stop()
+        self._session.stop()
 
     @async.coroutine
     def start_service(name):
