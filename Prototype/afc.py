@@ -101,137 +101,19 @@ class OperationResult:
     FORCE_SIGNED_TYPE = -1
 
 
-# #
-# # InternalOpenFileWLink
-# #
-#
-# class InternalOpenFileWLink(wl.WorkflowLink):
-#     def proceed(self):
-#         logger().debug('InternalOpenFileWLink: Opening file {0}'.format(self.data.path))
-#         self.data.session.send(Operation.FILE_OPEN, FileNameAndModePacket(self.data.path, self.data.mode).encode(),
-#                                None, lambda x, y, z: self.blocked() or self.on_open_file(x, y, z))
-#         self.stop_next()
-#
-#     def on_open_file(self, operation, data, payload):
-#         if operation == Operation.FILE_OPEN_RES:
-#             self.data.handle = ResultPacket.decode(data).param
-#             logger().debug('InternalOpenFileWLink: Done. File handle: {0}'.format(self.data.handle))
-#             self.next()
-#         else:
-#             raise RuntimeError('Failed to open file {0}'.format(self.data.path))
-#
-#
-# #
-# # InternalLockFileWLink
-# #
-#
-# class InternalLockFileWLink(wl.WorkflowLink):
-#     def proceed(self):
-#         logger().debug('InternalLockFileWLink: Locking file handle {0} with op {1}'.format(self.data.handle,
-#                                                                                            self.data.lock_operation))
-#         self.data.session.send(Operation.FILE_LOCK, LockInfoPacket(self.data.handle, self.data.lock_operation).encode(),
-#                                None, lambda x, y, z: self.blocked() or self.on_lock_file(x, y, z))
-#         self.stop_next()
-#
-#     def on_lock_file(self, operation, data, payload):
-#         if operation == Operation.STATUS:
-#             self.data.lock_result = ResultPacket.decode(data).param
-#             logger().debug('InternalLockFileWLink: Done. Result: {0}'.format(self.data.lock_result))
-#             self.next()
-#         else:
-#             raise RuntimeError('Failed to lock file with handle {0}'.format(self.data.handle))
-#
-#
-# #
-# # InternalCloseFileWLink
-# #
-#
-# class InternalCloseFileWLink(wl.WorkflowLink):
-#     def proceed(self):
-#         logger().debug('InternalCloseFileWLink: Closing file handle {0}'.format(self.data.handle))
-#         self.data.session.send(Operation.FILE_CLOSE, HandlePacket(self.data.handle).encode(), None,
-#                                lambda x, y, z: self.blocked() or self.on_close_file(x, y, z))
-#         self.stop_next()
-#
-#     def on_close_file(self, operation, data, payload):
-#         if operation == Operation.STATUS:
-#             self.data.handle = None
-#             self.data.close_result = ResultPacket.decode(data).param
-#             logger().debug('InternalCloseFileWLink: Done.')
-#             self.next()
-#         else:
-#             raise RuntimeError('Failed to close file with handle {0}'.format(self.data.handle))
-#
-#
-# #
-# # MessageReceiver
-# #
-#
-# class MessageReceiver:
-#     def __init__(self):
-#         self.reset()
-#
-#     def recv(self, connection):
-#         if not self.header:
-#             if len(self.__data) < Header.SIZE:
-#                 self.__data += connection.recv(Header.SIZE - len(self.__data))
-#                 if len(self.__data) == Header.SIZE:
-#                     self.header = Header.decode(self.__data)
-#                     self.__data = b''
-#                     if self.header.size == 0 and self.header.payload_size == 0:
-#                         return True
-#         elif self.header.size > 0:
-#             if len(self.__data) < self.header.size:
-#                 self.__data += connection.recv(self.header.size - len(self.__data))
-#                 if len(self.__data) == self.header.size:
-#                     self.data = self.__data
-#                     self.__data = b''
-#                     if self.header.payload_size == 0:
-#                         return True
-#         elif self.header.payload_size > 0:
-#             if len(self.__data) < self.header.size:
-#                 self.__data += connection.recv(self.header.payload_size - len(self.__data))
-#                 if len(self.__data) == self.header.size:
-#                     self.payload = self.__data
-#                     self.__data = b''
-#                     return True
-#         return False
-#
-#     def reset(self):
-#         self.header = None
-#         self.data = b''
-#         self.payload = b''
-#         self.__data = b''
-#
-#
-# #
-# # PacketChannel
-# #
-#
-# class PacketChannel:
-#     def __init__(self, connection):
-#         self.connection = connection
-#         self.connection.on_ready_to_recv = self.__on_ready_to_recv
-#         self.on_incoming_packet = lambda data, tag, mtype: None
-#         self.__message_receiver = MessageReceiver()
-#
-#     def send(self, operation, data, payload, index):
-#         header = Header(len(data) if data else 0, len(payload) if payload else 0, index, operation)
-#         self.connection.send(header.encode())
-#         if data:
-#             self.connection.send(data)
-#         if payload:
-#             self.connection.send(payload)
-#
-#     def __on_ready_to_recv(self):
-#         if self.__message_receiver.recv(self.connection):
-#             header = self.__message_receiver.header
-#             data = self.__message_receiver.data
-#             payload = self.__message_receiver.payload
-#             self.__message_receiver.reset()
-#             if header.magic != header.MAGIC:
-#                 raise RuntimeError('Incorrect packet header.')
-#             self.on_incoming_packet(header.operation, data, payload, header.index)
+class FileOpenMode:
+    READ_ONLY = 0x00000001         # r   O_RDONLY
+    READ_WRITE = 0x00000002        # r+  O_RDWR   | O_CREAT
+    WRITE_ONLY = 0x00000003        # w   O_WRONLY | O_CREAT  | O_TRUNC
+    WRITE_READ = 0x00000004        # w+  O_RDWR   | O_CREAT  | O_TRUNC
+    WRITE_APPEND = 0x00000005      # a   O_WRONLY | O_APPEND | O_CREAT
+    WRITE_READ_APPEND = 0x00000006  # a+  O_RDWR   | O_APPEND | O_CREAT
+
+
+class FileLockMode:
+    SHARED = 1 | 4
+    EXCLUSIVE = 2 | 4
+    UNLOCK = 8 | 4
 
 
 #
@@ -434,3 +316,25 @@ class Client:
             return handle
         else:
             raise RuntimeError('Failed to open \'{0}\''.format(path))
+
+    @async.coroutine
+    def close_file(self, handle):
+        app_log.debug('Trying to close file handle={0}'.format(handle), **log_extra(self))
+        op, data, _ = yield self._session.fetch(Operation.FILE_CLOSE, HandlePacket(handle).encode())
+        if op == Operation.STATUS:
+            result = ResultPacket.decode(data).param
+            app_log.info('Done. Handle={0}'.format(handle), **log_extra(self))
+            return result
+        else:
+            raise RuntimeError('Failed to close file handle \'{0}\''.format(handle))
+
+    @async.coroutine
+    def lock_file(self, handle, mode):
+        app_log.debug('Trying to lock file handle={0} with mode={1}'.format(handle, mode), **log_extra(self))
+        op, data, _ = yield self._session.fetch(Operation.FILE_LOCK, LockInfoPacket(handle, mode).encode())
+        if op == Operation.STATUS:
+            result = ResultPacket.decode(data).param
+            app_log.info('Done. Handle={0}'.format(handle), **log_extra(self))
+            return result
+        else:
+            raise RuntimeError('Failed to close file handle \'{0}\''.format(handle))
