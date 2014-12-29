@@ -4,7 +4,7 @@
 # AppleFileCoduit service
 #
 # Created by Grigory Zubankov.
-#  Copyright (c) 2014 Grigory Zubankov. All rights reserved.
+# Copyright (c) 2014 Grigory Zubankov. All rights reserved.
 #
 
 
@@ -274,9 +274,11 @@ class FileNameAndModePacket:
         name = str.encode(self.name + '\0')
         return struct.pack('<Q{0}s'.format(len(name)), self.mode, name)
 
-        # def decode(self, encoded):
-        #   self.mode, self.name = struct.unpack_from('<Q{0}s'.format(len(encoded) - 8 - 1), encoded)
-        #   self.name = self.name.decode('ascii')
+    @classmethod
+    def decode(cls, encoded):
+        mode, name = struct.unpack_from('<Q{0}s'.format(len(encoded) - 8 - 1), encoded)
+        name = name.decode('ascii')
+        return FileNameAndModePacket(name, mode)
 
 
 #
@@ -291,8 +293,10 @@ class LockInfoPacket:
     def encode(self):
         return struct.pack('<QQ', self.handle, self.lock_operation)
 
-        # def decode(self, encoded):
-        #   self.handle, self.lock_operation = struct.unpack_from('<QQ', encoded)
+    @classmethod
+    def decode(cls, encoded):
+        handle, lock_operation = struct.unpack_from('<QQ', encoded)
+        return LockInfoPacket(handle, lock_operation)
 
 
 #
@@ -306,8 +310,10 @@ class HandlePacket:
     def encode(self):
         return struct.pack('<Q', self.handle)
 
-        # def decode(self, encoded):
-        #   self.handle,  = struct.unpack_from('<Q', encoded)
+    @classmethod
+    def decode(cls, encoded):
+        handle, = struct.unpack_from('<Q', encoded)
+        return HandlePacket(handle)
 
 
 #
@@ -322,7 +328,7 @@ class ResultPacket:
         return struct.pack('<Q', self.param)
 
     @classmethod
-    def decode(self, encoded):
+    def decode(cls, encoded):
         param, = struct.unpack_from('<Q', encoded)
         return ResultPacket(param)
 
@@ -349,7 +355,7 @@ class InternalSession:
 
     @async.coroutine
     def fetch(self, op, data=None, payload=None):
-        header = Header(len(data) if data else 0, len(payload) if payload else 0, op, self._index)
+        header = Header(len(data) if data else 0, len(payload) if payload else 0, self._index, op)
         header_data = header.encode()
         #
         self._channel.write(header_data)
@@ -419,5 +425,12 @@ class Client:
         self._session.stop()
 
     @async.coroutine
-    def start_service(name):
-        return None
+    def open_file(self, path, mode):
+        app_log.debug('Trying to open file \'{0}\' mode={1}'.format(path, mode), **log_extra(self))
+        op, data, _ = yield self._session.fetch(Operation.FILE_OPEN, FileNameAndModePacket(path, mode).encode())
+        if op == Operation.FILE_OPEN_RES:
+            handle = ResultPacket.decode(data).param
+            app_log.info('Done. Handle={0}'.format(handle), **log_extra(self))
+            return handle
+        else:
+            raise RuntimeError('Failed to open \'{0}\''.format(path))

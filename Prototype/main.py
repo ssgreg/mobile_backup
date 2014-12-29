@@ -114,7 +114,7 @@ class TestBackup:
         with (yield mb.UsbMuxDirectory.make(make_channel)) as directory:
             object = yield directory.wait_for_object(self.sn, connection_type=mb.TYPE_USB)
             with (yield object.afc_client()) as afc_client:
-                print(afc_client)
+                yield afc_client.open_file(path='/com.apple.itunes.lock_sync', mode=2)
             print(object)
 
 
