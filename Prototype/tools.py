@@ -7,6 +7,10 @@
 #  Copyright (c) 2014 Grigory Zubankov. All rights reserved.
 #
 
+import tempfile
+import os
+import ssl
+
 
 def log_extra(obj):
     oid = id(obj)
@@ -24,3 +28,23 @@ def log_extra_cls(cls):
             classname=cls.__name__,
         )
     )
+
+
+def ssl_wrap_socket(io, certificate, key):
+    certfile = tempfile.NamedTemporaryFile(delete=False) if certificate else None
+    keyfile = tempfile.NamedTemporaryFile(delete=False) if key else None
+    try:
+        if certfile:
+            certfile.write(certificate)
+            certfile.close()
+            certfile = certfile.name
+        if keyfile:
+            keyfile.write(key)
+            keyfile.close()
+            keyfile = keyfile.name
+        return ssl.wrap_socket(io, certfile=certfile, keyfile=keyfile, ssl_version=3)
+    finally:
+        if certfile:
+            os.remove(certfile)
+        if keyfile:
+            os.remove(keyfile)
