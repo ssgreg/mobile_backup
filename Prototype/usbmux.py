@@ -195,19 +195,23 @@ class Client:
     @async.coroutine
     def make(channel_factory):
         client = Client(channel_factory)
-        app_log.debug('Making a usbmux.Client...', **log_extra(client))
-        yield client._connect()
-        app_log.info('A usbmux.Client object is created', **log_extra(client))
+        yield client.connect()
         return client
+
+    @async.coroutine
+    def connect(self):
+        app_log.debug('Connecting to a usbmuxd...', **log_extra(self))
+        yield self._session.start()
+        app_log.info('Connected to a usbmuxd', **log_extra(self))
+
+    def close(self):
+        self._session.stop()
+        app_log.info('Closed', **log_extra(self))
 
     @async.coroutine
     def connect_to_device_service(self, did, port):
         with (yield Client.make(self._channel_factory)) as client:
             return (yield client.turn_to_tunnel_to_device_service(did, port))
-
-    def close(self):
-        self._session.stop()
-        app_log.info('Closed', **log_extra(self))
 
     @async.coroutine
     def list_devices(self):
@@ -261,10 +265,6 @@ class Client:
         buid = reply['BUID']
         app_log.info('Done. BUID={0}'.format(buid), **log_extra(self))
         return buid
-
-    @async.coroutine
-    def _connect(self):
-        yield self._session.start()
 
     def _on_listen_notification(self, on_attached, on_detached, attached, info):
         if attached and on_attached:

@@ -146,13 +146,25 @@ class Client:
     @async.coroutine
     def make(pair_record, buid, channel_factory):
         client = Client(pair_record, buid, channel_factory)
-        app_log.debug('Making a lockdown.Client...', **log_extra(client))
-        yield client._connect()
-        yield client._query_type()
-        yield client._validate_pair_record()
-        yield client._start_session()
-        app_log.info('A lockdown.Client object is created', **log_extra(client))
+        yield client.connect()
         return client
+
+    @async.coroutine
+    def connect(self):
+        app_log.debug('Connecting to a lockdown service...', **log_extra(self))
+        yield self._session.start()
+        try:
+            yield self._query_type()
+            yield self._validate_pair_record()
+            yield self._start_session()
+        except Exception as e:
+            self._session.stop()
+            raise e
+        app_log.info('Connected to a lockdown service... Handshake is finished.', **log_extra(self))
+
+    def close(self):
+        self._session.stop()
+        app_log.info('Closed', **log_extra(self))
 
     @async.coroutine
     def start_service(self, name, use_escrow_bag=False):
@@ -168,14 +180,6 @@ class Client:
         port = reply['Port']
         app_log.info('Done. Port={0}'.format(port), **log_extra(self))
         return port
-
-    def close(self):
-        self._session.stop()
-        app_log.info('Closed', **log_extra(self))
-
-    @async.coroutine
-    def _connect(self):
-        yield self._session.start()
 
     @async.coroutine
     def _query_type(self):

@@ -57,26 +57,32 @@ class UsbMuxDirectory:
     def __exit__(self, type, value, traceback):
         self.close()
 
-    @async.coroutine
     def close(self):
-        not self._usbmux_client or (self._usbmux_client.close())
-        app_log.info('Closed', **log_extra(self))
+        if self._usbmux_client:
+            self._usbmux_client.close()
+            app_log.info('Closed', **log_extra(self))
 
     @staticmethod
     @async.coroutine
     def make(channel_factory):
         directory = UsbMuxDirectory(channel_factory)
-        app_log.info('Making a UsbMuxDirectory...', **log_extra(directory))
-        directory._usbmux_client = yield directory._make_usbmux_client()
-#        raise RuntimeError('test')
-        directory._buid = yield directory._usbmux_client.read_buid()
-        app_log.debug('A UsbMuxDirectory is created.', **log_extra(directory))
+        yield directory.open(channel_factory)
         return directory
 
     @async.coroutine
+    def open(self, channel_factory):
+        app_log.info('Trying to open UsbMuxDirectory...', **log_extra(self))
+        self._usbmux_client = yield self._make_usbmux_client()
+        try:
+            self._buid = yield self._usbmux_client.read_buid()
+        except Exception as e:
+            self._usbmux_client.close()
+            raise e
+        app_log.debug('A UsbMuxDirectory is opened.', **log_extra(self))
+
+    @async.coroutine
     def objects(self):
-        with (yield self._make_usbmux_client()) as service:
-            devices = yield service.list_devices()
+        devices = yield self._usbmux_client.list_devices()
         return [(yield self._make_object(device)) for device in devices]
 
     @async.coroutine
