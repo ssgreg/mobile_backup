@@ -77,11 +77,16 @@ class TestBackup:
         with (yield mb.UsbMuxDirectory.make(make_channel)) as directory:
             object = yield directory.wait_for_object(self.sn, connection_type=mb.TYPE_USB)
             print(object)
+
+            with (yield object.mb2_client()) as mb2_client:
+                pass
+
             # res = yield object.get_value('com.apple.mobile.backup', 'WillEncrypt')
             # print(res)
-            with (yield object.afc_client()) as afc_client:
-                content = yield afc_client.read_directory('/')
-                print(content)
+            # with (yield object.afc_client()) as afc_client:
+            #     content = yield afc_client.read_directory('/')
+            #     print(content)
+
                 # yield afc_client.file_info('/Books/iBooksData2.plist')
                 # handle = yield afc_client.open_file(path='/Books/iBooksData2.plist', mode=afc.FileOpenMode.READ_ONLY)
                 #
@@ -247,64 +252,6 @@ class TestBackup:
 #     self.workflow.start()
 
 
-# #
-# # MobileBackup2ConnectToWLink
-# #
-
-# class MobileBackup2ConnectToWLink(wl.WorkflowLink):
-#   def proceed(self):
-#     self.data.mobilebackup2.connect(self.data.did, self.data.service_port, lambda: self.blocked() or self.next())
-#     self.stop_next()
-
-
-# #
-# # MobileBackup2HelloWLink
-# #
-
-# class MobileBackup2HelloWLink(wl.WorkflowLink):
-#   def proceed(self):
-#     self.data.mobilebackup2.hello(lambda: self.blocked() or self.next())
-#     self.stop_next()
-
-
-# #
-# # TestBackup
-# #
-
-# class TestBackup:
-#   def __init__(self, io_service, did, sn):
-#     self.io_service = SafeIOService(io_service, self.on_exit)
-#     self.did = did
-#     self.sn = sn
-#     self.directory = idevice.UsbMuxDirectory(lambda: Connection(self.io_service, connect()))
-#     self.data = dict(directory=self.directory)
-
-#   def start(self):
-#     self.io_service.execute(self.on_enter)
-
-#   def close(self):
-#     pass
-
-#   def on_enter(self):
-#     workflow = wl.WorkflowBatch(
-#       idevice.DirectoryFindObjectWLink(self.data, did=self.did, sn=self.sn),
-#       idevice.ObjectGetAfcServiceWLink(self.data),
-# #      idevice.ObjectGetNpServiceWLink(self.data),
-#       afc.OpenFileWLink(self.data, path='/com.apple.itunes.lock_sync', mode=2),
-#       afc.LockFileWLink(self.data, lock_operation=2),
-#       afc.CloseFileWLink(self.data),
-#       wl.ProxyWorkflowLink(lambda: self.on_exit(None)))
-#     workflow.start()
-
-#   def on_exit(self, e):
-#     logger().debug('Exit')
-#     if e:
-#       import traceback  
-#       logger().error(traceback.format_exc())
-#       print(e)∫
-#     self.directory.close()
-#     if 'object' in self.data:
-#       self.data['object'].close()
 
 
 def configure_argparse():

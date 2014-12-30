@@ -11,6 +11,7 @@
 import afc
 import async
 import lockdown
+import mb2
 import usbmux
 from logger import app_log
 from tools import log_extra
@@ -135,13 +136,17 @@ class Object:
         return (yield afc.Client.make(self._make_channel_to_device_service))
 
     @async.coroutine
+    def mb2_client(self):
+        return (yield mb2.Client.make(self._make_channel_to_device_service))
+
+    @async.coroutine
     def _make_channel_to_port(self, port):
         return (yield self._channel_factory(self.did, port))
 
     @async.coroutine
-    def _make_channel_to_device_service(self, name):
+    def _make_channel_to_device_service(self, service, use_escrow_bag=False):
         with (yield lockdown.Client.make(self._pair_record, self._buid, self._make_channel_to_port)) as lockdown_client:
-            port = yield lockdown_client.start_service(name)
+            port = yield lockdown_client.start_service(service, use_escrow_bag)
             return (yield self._make_channel_to_port(port))
 
     @property
