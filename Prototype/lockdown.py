@@ -105,9 +105,6 @@ class InternalSession:
 
     @async.coroutine
     def fetch(self, msg):
-        if 'Request' not in msg:
-            raise RuntimeError('Passed msg does not contain a \'Request\' field.')
-        #
         request_data = plistlib.dumps(msg)
         request_header_data = LockdownHeader(len(request_data)).encode()
         #
@@ -120,16 +117,23 @@ class InternalSession:
         if header.size > self.MAX_REPLY_SIZE:
             raise RuntimeError('Lockdown header size is too big!')
 
+    def _validate_message(self, msg):
+        if 'Request' not in msg:
+            raise RuntimeError('Message does not contain a \'Request\' field.')
+
     @async.coroutine
     def _read_message(self):
-        reply_header_data = yield self._channel.read_async(LockdownHeader.SIZE)
-        reply_header = LockdownHeader.decode(reply_header_data)
-        self._validate_header(reply_header)
-        reply_data = yield self._channel.read_async(reply_header.size)
-        return plistlib.loads(reply_data)
+        header_data = yield self._channel.read_async(LockdownHeader.SIZE)
+        header = LockdownHeader.decode(header_data)
+        self._validate_header(header)
+        data = yield self._channel.read_async(header.size)
+        message = plistlib.loads(data)
+        self._validate_message(message)
+        return message
 
     def enable_ssl(self, cert, key):
         self._channel.enable_ssl(cert, key)
+
 
 #
 # Client
@@ -187,6 +191,20 @@ class Client:
         return port
 
     @async.coroutine
+    def get_value(self, domain=None, key=None):
+        app_log.debug('Getting value with domain={0} and key={1}...'.format(domain, key), **log_extra(self))
+        reply = yield self._session.fetch(create_message_get_value(domain, key))
+        #
+        value = None
+        if 'Error' in reply:
+            if reply['Error'] != 'MissingValue':
+                raise RuntimeError('Failed to get value. Reply: {0}'.format(reply))
+        if 'Value' in reply:
+            value = reply['Value']
+        app_log.info('Done.', **log_extra(self))
+        return value
+
+    @async.coroutine
     def _query_type(self):
         app_log.debug('Querying lockdown type...', **log_extra(self))
         reply = yield self._session.fetch(create_message_query_type())
@@ -218,23 +236,3 @@ class Client:
         if use_ssl:
             self._session.enable_ssl(self._pair_record['HostCertificate'], self._pair_record['HostPrivateKey'])
         app_log.info('Done. SessionID={0}'.format(session_id), **log_extra(self))
-
-# #
-# # InternalGetValueWLink
-# #
-#
-# class InternalGetValueWLink(wl.WorkflowLink):
-#   def proceed(self):
-#     logger().debug('InternalGetValueWLink: Getting value')
-#     self.data.session.send(create_lockdown_message_get_value(), lambda x: self.blocked() or self.on_get_value(x))
-#     self.stop_next()
-#
-#   def on_get_value(self, result):
-#     if 'Value' in result:
-#       logger().debug('InternalGetValueWLink: Done')
-#       self.data.get_value_result = result['Value']
-#       self.next();
-#     else:
-#       raise RuntimeError('Failed to get value. Answer is: {0}'.format(result))
-#
-#

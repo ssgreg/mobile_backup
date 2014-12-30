@@ -113,15 +113,17 @@ class TestBackup:
     def start(self):
         with (yield mb.UsbMuxDirectory.make(make_channel)) as directory:
             object = yield directory.wait_for_object(self.sn, connection_type=mb.TYPE_USB)
-            with (yield object.afc_client()) as afc_client:
-                handle = yield afc_client.open_file(path='/com.apple.itunes.lock_sync', mode=afc.FileOpenMode.READ_WRITE)
-                res = yield afc_client.lock_file(handle=handle, mode=afc.FileLockMode.EXCLUSIVE)
-                print(res)
-                res = yield afc_client.lock_file(handle=handle, mode=afc.FileLockMode.UNLOCK)
-                print(res)
-                res = yield afc_client.close_file(handle)
-                print(res)
             print(object)
+            res = yield object.get_value('com.apple.mobile.backup', 'WillEncrypt')
+            print(res)
+            # with (yield object.afc_client()) as afc_client:
+            #     handle = yield afc_client.open_file(path='/com.apple.itunes.lock_sync', mode=afc.FileOpenMode.READ_WRITE)
+            #     res = yield afc_client.lock_file(handle=handle, mode=afc.FileLockMode.EXCLUSIVE)
+            #     print(res)
+            #     res = yield afc_client.lock_file(handle=handle, mode=afc.FileLockMode.UNLOCK)
+            #     print(res)
+            #     res = yield afc_client.close_file(handle)
+            #     print(res)
 
 
 # #

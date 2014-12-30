@@ -126,6 +126,11 @@ class Object:
         return str(self._device)
 
     @async.coroutine
+    def get_value(self, domain=None, key=None):
+        with (yield lockdown.Client.make(self._pair_record, self._buid, self._make_channel_to_port)) as lockdown_client:
+            return (yield lockdown_client.get_value(domain, key))
+
+    @async.coroutine
     def afc_client(self):
         return (yield afc.Client.make(self._make_channel_to_device_service))
 
