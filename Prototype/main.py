@@ -106,16 +106,6 @@ class TestBackup:
 
 
 # #
-# # SessionChangeToCommonService
-# #
-
-# class SessionChangeToCommonService(wl.WorkflowLink):
-#   def proceed(self):
-#     self.data.session = CommonServiceSession(self.data.connection)
-#     self.next()
-
-
-# #
 # # DeviceLinkVersionExchangeWLink
 # #
 
@@ -173,33 +163,6 @@ class TestBackup:
 # # DeviceLinkService
 # #
 
-# class DeviceLinkService:
-#   def __init__(self, io_service):
-#     self.io_service = io_service
-#     self.data = dict(io_service=self.io_service, device_link=self)
-
-#   def connect(self, did, port, on_result):
-#     self.workflow = wl.WorkflowBatch(
-#       ConnectToUsbMuxdWLink(self.data),
-#       SessionChangeToUsbMuxWLink(self.data),
-#       ConnectToServiceWLink(self.data, did=did, service_port=port),
-#       SessionChangeToCommonService(self.data),
-#       wl.ProxyWorkflowLink(on_result))
-#     self.workflow.start()
-
-#   def vesion_exchange(self, on_result):
-#     self.workflow = wl.WorkflowBatch(DeviceLinkVersionExchangeWLink(self.data), wl.ProxyWorkflowLink(on_result))
-#     self.workflow.start()
-
-#   def process_message(self, message, on_result):
-#     self.workflow = wl.WorkflowBatch(DeviceLinkInternalProcessMessageWLink(self.data, message=message), wl.ProxyWorkflowLink(on_result))
-#     self.workflow.start()
-
-#   def close(self):
-#     if 'connection' in self.data:
-#       logger().debug('Closing device link connection...')
-#       self.data['connection'].close()
-
 
 # #
 # # MobileBackup2InternalHelloWLink
@@ -222,34 +185,6 @@ class TestBackup:
 #         raise RuntimeError('MobileBackup2InternalHelloWLink: No common version')
 #     else:
 #       raise RuntimeError('MobileBackup2InternalHelloWLink: Incorrect reply')
-
-
-# #
-# # MobileBackup2ConnectUsingDeviceLinkWLink
-# #
-
-# class MobileBackup2ConnectUsingDeviceLinkWLink(wl.WorkflowLink):
-#   def proceed(self):
-#     self.data.device_link.connect(self.data.did, self.data.service_port, lambda: self.blocked() or self.next())
-#     self.stop_next()
-
-
-# #
-# # MobileBackup2Service
-# #
-
-# class MobileBackup2Service(DeviceLinkService):
-#   SERVICE_NAME = 'com.apple.mobilebackup2'
-
-#   def __init__(self, io_service):
-#     super().__init__(io_service)
-
-#   def hello(self, on_result):
-#     self.workflow = wl.WorkflowBatch(
-#       DeviceLinkVersionExchangeWLink(self.data),
-#       MobileBackup2InternalHelloWLink(self.data),
-#       wl.ProxyWorkflowLink(on_result))
-#     self.workflow.start()
 
 
 

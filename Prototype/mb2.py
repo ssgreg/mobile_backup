@@ -8,6 +8,7 @@
 #
 
 import plistlib
+import device_link
 #
 import async
 from logger import app_log
@@ -43,12 +44,10 @@ class InternalSession:
         self._channel.close()
 
     @async.coroutine
-    def fetch(self, msg):
-        request_data = plistlib.dumps(msg)
-#        request_header_data = LockdownHeader(len(request_data)).encode()
-        #
- #       self._channel.write(request_header_data)
-        self._channel.write(request_data)
+    def fetch(self, msg=None):
+        if msg:
+            request_data = plistlib.dumps(msg)
+            self._channel.write(request_data)
         #
         return (yield self._read_message())
 
@@ -64,7 +63,7 @@ class InternalSession:
     def _read_message(self):
         # header_data = yield self._channel.read_async(LockdownHeader.SIZE)
         # header = LockdownHeader.decode(header_data)
-        self._validate_header(header)
+#        self._validate_header(header)
         data = yield self._channel.read_async(header.size)
         message = plistlib.loads(data)
         self._validate_message(message)
@@ -100,10 +99,7 @@ class Client:
         app_log.debug('Connecting to a mb2 service...', **log_extra(self))
         yield self._session.start()
         try:
-            pass
-            # yield self._query_type()
-            # yield self._validate_pair_record()
-            # yield self._start_session()
+            yield self._device_link_version_exchange()
         except Exception as e:
             self._session.stop()
             raise e
@@ -112,3 +108,16 @@ class Client:
     def close(self):
         self._session.stop()
         app_log.info('Closed', **log_extra(self))
+
+
+    @async.coroutine
+    def _device_link_version_exchange(self):
+        VERSION_MAJOR = 300
+        VERSION_MINOR = 0
+
+        app_log.debug('Waiting for a version exchange. Expected version is: {0}.{1}'.format(VERSION_MAJOR, VERSION_MINOR), **log_extra(self))
+        reply = yield self._session.fetch(device_link.create_device_link_message_dl_version_ok(VERSION_MAJOR, VERSION_MINOR))
+        # #
+        # if 'Error' in reply:
+        #     raise RuntimeError('Failed to validate pair. Error: {0}'.format(reply['Error']))
+        app_log.info('Done.', **log_extra(self))
