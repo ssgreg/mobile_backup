@@ -8,23 +8,8 @@
 #
 
 
-#
-from logger import *
-from tools import *
-import wl
 
 
 SERVICE_TYPE = 'com.apple.mobile.notification_proxy'
 
 
-#
-# Service
-#
-
-class Service:
-  def __init__(self, connection):
-    self.connection = connection
-
-  def close(self):
-    logger().debug('Closing NotificationProxy connection...')
-    self.connection.close()

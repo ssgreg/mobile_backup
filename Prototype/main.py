@@ -8,20 +8,13 @@
 #
 
 import argparse
-import sys
 import traceback
 #
 from ioloop import *
 from logger import app_log, enable_pretty_logging
-from tools import *
 import afc
 import logging
 import async
-import device_link
-import idevice
-import ioloop
-import lockdown
-import mobilebackup2
 import usbmux
 import mb
 
@@ -32,36 +25,6 @@ def make_channel():
     else:
         return SocketChannel(address=('127.0.0.1', 27015))
 
-
-# #
-# # CommonServiceSession
-# #
-
-# class CommonServiceSession:
-#   def __init__(self, connection):
-#     self.__channel = lockdown.LockdownPlistChannel(connection)
-#     self.__channel.on_incoming_plist = self.__on_incoming_plist
-#     self.on_notification = lambda plist_data: None
-#     self.reset()
-#     logger().debug('Common service session has started')
-
-#   def send(self, plist_data, on_result):
-#     self.callback = on_result
-#     self.__channel.send(plist_data)
-
-#   def __on_incoming_plist(self, plist_data):
-#     callback = self.callback
-#     self.reset()
-#     if callback:
-#       callback(plist_data)
-#     else:
-#       self.on_notification(plist_data)
-
-#   def enable_ssl(self, cert, key):
-#     self.__connection.enable_ssl(cert, key)
-
-#   def reset(self):
-#     self.callback = None
 
 
 #
@@ -114,10 +77,10 @@ class TestBackup:
         with (yield mb.UsbMuxDirectory.make(make_channel)) as directory:
             object = yield directory.wait_for_object(self.sn, connection_type=mb.TYPE_USB)
             print(object)
-            res = yield object.get_value('com.apple.mobile.backup', 'WillEncrypt')
-            print(res)
+            # res = yield object.get_value('com.apple.mobile.backup', 'WillEncrypt')
+            # print(res)
             with (yield object.afc_client()) as afc_client:
-                content = yield afc_client.read_directory('/Books')
+                content = yield afc_client.read_directory('/')
                 print(content)
                 # yield afc_client.file_info('/Books/iBooksData2.plist')
                 # handle = yield afc_client.open_file(path='/Books/iBooksData2.plist', mode=afc.FileOpenMode.READ_ONLY)
