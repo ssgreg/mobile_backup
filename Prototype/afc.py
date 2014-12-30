@@ -310,7 +310,20 @@ class Client:
             app_log.info('Done. {0} bytes, {1}'.format(info['st_size'], datetime.datetime.fromtimestamp(info['st_mtime'])),  **log_extra(self))
             return info
         else:
-            raise RuntimeError('Failed to close file handle \'{0}\''.format(handle))
+            raise RuntimeError('Failed to get file info')
+
+    @async.coroutine
+    def read_directory(self, path):
+        app_log.debug('Reading directory \'{0}\'...'.format(path), **log_extra(self))
+        op, _, payload = yield self._session.fetch(Operation.READ_DIR, _pack_path(path))
+        if op == Operation.DATA:
+            content = payload[:-1].decode('ascii').split('\x00')
+            if '.' in content: content.remove('.')
+            if '..' in content: content.remove('..')
+            app_log.info('Done. {0} items'.format(len(content)),  **log_extra(self))
+            return content
+        else:
+            raise RuntimeError('Failed to read the a directory')
 
     def _loads_file_info(self, data):
         i = iter(data[:-1].split(b'\x00'))
