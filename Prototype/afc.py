@@ -294,6 +294,8 @@ class Client:
         app_log.debug('Trying to read file handle={0} with length={1}'.format(handle, length), **log_extra(self))
         op, _, payload = yield self._session.fetch(Operation.FILE_READ, _pack(handle, length))
         if op == Operation.DATA:
+            if not payload:
+                payload = b''
             app_log.info('Done. Received={0} bytes'.format(len(payload)), **log_extra(self))
             return payload
         else:
