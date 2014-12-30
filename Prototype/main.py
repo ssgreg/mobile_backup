@@ -116,14 +116,16 @@ class TestBackup:
             print(object)
             res = yield object.get_value('com.apple.mobile.backup', 'WillEncrypt')
             print(res)
-            # with (yield object.afc_client()) as afc_client:
-            #     handle = yield afc_client.open_file(path='/com.apple.itunes.lock_sync', mode=afc.FileOpenMode.READ_WRITE)
-            #     res = yield afc_client.lock_file(handle=handle, mode=afc.FileLockMode.EXCLUSIVE)
-            #     print(res)
-            #     res = yield afc_client.lock_file(handle=handle, mode=afc.FileLockMode.UNLOCK)
-            #     print(res)
-            #     res = yield afc_client.close_file(handle)
-            #     print(res)
+            with (yield object.afc_client()) as afc_client:
+                handle = yield afc_client.open_file(path='/Books/iBooksData2.plist', mode=afc.FileOpenMode.READ_ONLY)
+                yield afc_client.read_file(handle, 65535)
+                # handle = yield afc_client.open_file(path='/com.apple.itunes.lock_sync', mode=afc.FileOpenMode.READ_WRITE)
+                # res = yield afc_client.lock_file(handle=handle, mode=afc.FileLockMode.EXCLUSIVE)
+                # print(res)
+                # res = yield afc_client.lock_file(handle=handle, mode=afc.FileLockMode.UNLOCK)
+                # print(res)
+                res = yield afc_client.close_file(handle)
+                print(res)
 
 
 # #

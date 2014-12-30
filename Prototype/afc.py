@@ -126,93 +126,37 @@ class Header:
 
     def __init__(self, size=None, payload_size=None, index=None, operation=None):
         self.magic = self.MAGIC
-        self.size = size
         self.payload_size = payload_size
+        self.size = size
         self.index = index
         self.operation = operation
 
     def encode(self):
-        return struct.pack('<8sQQQQ', self.magic, self.size + self.SIZE, self.size + self.SIZE + self.payload_size,
+        return struct.pack('<8sQQQQ', self.magic, self.size + self.SIZE + self.payload_size, self.size + self.SIZE,
                            self.index, self.operation)
 
     @classmethod
     def decode(self, encoded):
-        magic, size, payload_size, index, operation = struct.unpack_from('<8sQQQQ', encoded)
+        magic, payload_size, size, index, operation = struct.unpack_from('<8sQQQQ', encoded)
         payload_size -= size
         size -= self.SIZE
         return Header(size, payload_size, index, operation)
 
 
-#
-# FileModeWithNamePacket
-#
-
-class FileNameAndModePacket:
-    def __init__(self, name=None, mode=None):
-        self.name = name
-        self.mode = mode
-
-    def encode(self):
-        name = str.encode(self.name + '\0')
-        return struct.pack('<Q{0}s'.format(len(name)), self.mode, name)
-
-    @classmethod
-    def decode(cls, encoded):
-        mode, name = struct.unpack_from('<Q{0}s'.format(len(encoded) - 8 - 1), encoded)
-        name = name.decode('ascii')
-        return FileNameAndModePacket(name, mode)
+def _pack(param1, param2=None):
+    if param2:
+        return struct.pack('<QQ', param1, param2)
+    else:
+        return struct.pack('<Q', param1)
 
 
-#
-# LockInfoPacket
-#
-
-class LockInfoPacket:
-    def __init__(self, handle=None, lock_operation=None):
-        self.handle = handle
-        self.lock_operation = lock_operation
-
-    def encode(self):
-        return struct.pack('<QQ', self.handle, self.lock_operation)
-
-    @classmethod
-    def decode(cls, encoded):
-        handle, lock_operation = struct.unpack_from('<QQ', encoded)
-        return LockInfoPacket(handle, lock_operation)
+def _pack_path_and_mode(path, mode):
+    encoded = str.encode(path + '\0')
+    return struct.pack('<Q{0}s'.format(len(encoded)), mode, encoded)
 
 
-#
-# HandlePacket
-#
-
-class HandlePacket:
-    def __init__(self, handle=None):
-        self.handle = handle
-
-    def encode(self):
-        return struct.pack('<Q', self.handle)
-
-    @classmethod
-    def decode(cls, encoded):
-        handle, = struct.unpack_from('<Q', encoded)
-        return HandlePacket(handle)
-
-
-#
-# ResultPacket
-#
-
-class ResultPacket:
-    def __init__(self, param=None):
-        self.param = param
-
-    def encode(self):
-        return struct.pack('<Q', self.param)
-
-    @classmethod
-    def decode(cls, encoded):
-        param, = struct.unpack_from('<Q', encoded)
-        return ResultPacket(param)
+def _unpack_result(data):
+    return struct.unpack_from('<Q', data)[0]
 
 
 #
@@ -309,9 +253,9 @@ class Client:
     @async.coroutine
     def open_file(self, path, mode):
         app_log.debug('Trying to open file \'{0}\' mode={1}'.format(path, mode), **log_extra(self))
-        op, data, _ = yield self._session.fetch(Operation.FILE_OPEN, FileNameAndModePacket(path, mode).encode())
+        op, data, _ = yield self._session.fetch(Operation.FILE_OPEN, _pack_path_and_mode(path, mode))
         if op == Operation.FILE_OPEN_RES:
-            handle = ResultPacket.decode(data).param
+            handle = _unpack_result(data)
             app_log.info('Done. Handle={0}'.format(handle), **log_extra(self))
             return handle
         else:
@@ -320,9 +264,9 @@ class Client:
     @async.coroutine
     def close_file(self, handle):
         app_log.debug('Trying to close file handle={0}'.format(handle), **log_extra(self))
-        op, data, _ = yield self._session.fetch(Operation.FILE_CLOSE, HandlePacket(handle).encode())
+        op, data, _ = yield self._session.fetch(Operation.FILE_CLOSE, _pack(handle))
         if op == Operation.STATUS:
-            result = ResultPacket.decode(data).param
+            result = _unpack_result(data)
             app_log.info('Done. Handle={0}'.format(handle), **log_extra(self))
             return result
         else:
@@ -331,10 +275,20 @@ class Client:
     @async.coroutine
     def lock_file(self, handle, mode):
         app_log.debug('Trying to lock file handle={0} with mode={1}'.format(handle, mode), **log_extra(self))
-        op, data, _ = yield self._session.fetch(Operation.FILE_LOCK, LockInfoPacket(handle, mode).encode())
+        op, data, _ = yield self._session.fetch(Operation.FILE_LOCK, _pack(handle, mode))
         if op == Operation.STATUS:
-            result = ResultPacket.decode(data).param
+            result = _unpack_result(data)
             app_log.info('Done. Handle={0}'.format(handle), **log_extra(self))
             return result
+        else:
+            raise RuntimeError('Failed to close file handle \'{0}\''.format(handle))
+
+    @async.coroutine
+    def read_file(self, handle, length):
+        app_log.debug('Trying to read file handle={0} with length={1}'.format(handle, length), **log_extra(self))
+        op, _, payload = yield self._session.fetch(Operation.FILE_READ, _pack(handle, length))
+        if op == Operation.DATA:
+            app_log.info('Done. Received={0} bytes'.format(len(payload)), **log_extra(self))
+            return payload
         else:
             raise RuntimeError('Failed to close file handle \'{0}\''.format(handle))
