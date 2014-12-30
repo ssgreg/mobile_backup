@@ -9,6 +9,7 @@
 
 
 import struct
+import datetime
 #
 import async
 from logger import app_log
@@ -155,6 +156,11 @@ def _pack_path_and_mode(path, mode):
     return struct.pack('<Q{0}s'.format(len(encoded)), mode, encoded)
 
 
+def _pack_path(path):
+    encoded = str.encode(path + '\0')
+    return struct.pack('<{0}s'.format(len(encoded)), encoded)
+
+
 def _unpack_result(data):
     return struct.unpack_from('<Q', data)[0]
 
@@ -292,3 +298,34 @@ class Client:
             return payload
         else:
             raise RuntimeError('Failed to close file handle \'{0}\''.format(handle))
+
+    @async.coroutine
+    def file_info(self, path):
+        app_log.debug('Getting info about \'{0}\'...'.format(path), **log_extra(self))
+        op, _, payload = yield self._session.fetch(Operation.GET_FILE_INFO, _pack_path(path))
+        if op == Operation.DATA:
+            info = self._loads_file_info(payload)
+            app_log.info('Done. {0} bytes, {1}'.format(info['st_size'], datetime.datetime.fromtimestamp(info['st_mtime'])),  **log_extra(self))
+            return info
+        else:
+            raise RuntimeError('Failed to close file handle \'{0}\''.format(handle))
+
+    def _loads_file_info(self, data):
+        i = iter(data[:-1].split(b'\x00'))
+        raw = dict(zip(i, i))
+        result = {}
+        if b'st_size' in raw:
+            result['st_size'] = int(raw[b'st_size'])
+        if b'st_nlink' in raw:
+            result['st_nlink'] = int(raw[b'st_nlink'])
+        if b'st_blocks' in raw:
+            result['st_blocks'] = int(raw[b'st_blocks'])
+        if b'st_ifmt' in raw:
+            result['st_ifmt'] = raw[b'st_ifmt'].decode('ascii')
+        if b'st_birthtime' in raw:
+            # from nanosecods to seconds
+            result['st_birthtime'] = float(raw[b'st_birthtime']) / 1e9
+        if b'st_mtime' in raw:
+            # from nanosecods to seconds
+            result['st_mtime'] = float(raw[b'st_mtime']) / 1e9
+        return result
