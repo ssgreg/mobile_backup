@@ -10,14 +10,14 @@
 import struct
 
 
-def create_device_link_message_dl_version_ok(major, minor):
+def create_message_dl_version_ok(major, minor):
   return [
     'DLMessageVersionExchange',
     'DLVersionsOk',
     major
   ]
 
-def create_device_link_message_process_message(message):
+def create_message_process_message(message):
   return [
     'DLMessageProcessMessage',
     message

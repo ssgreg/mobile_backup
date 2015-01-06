@@ -99,18 +99,32 @@ class Client:
 
     @async.coroutine
     def connect(self):
-        app_log.debug('Connecting to a mb2 service...', **log_extra(self))
+        app_log.debug('Connecting to an mb2 service...', **log_extra(self))
         yield self._session.start()
         try:
             yield self._device_link_version_exchange()
+            yield self._hello()
         except Exception as e:
             self._session.stop()
             raise e
-        app_log.info('Connected to a mb2 service. Handshake is finished.', **log_extra(self))
+        app_log.info('Connected to an mb2 service. Handshake is finished.', **log_extra(self))
 
     def close(self):
         self._session.stop()
         app_log.info('Closed', **log_extra(self))
+
+
+    @async.coroutine
+    def _hello(self):
+        versions = [2.0, 2.1]
+        app_log.debug('Sending \'hello\' message. Supported protocol versions are: {0}...'.format(versions), **log_extra(self))
+        reply = yield self._device_link_process_message(create_message_hello(versions))
+        #
+        if 'MessageName' not in reply or reply['MessageName'] != 'Response':
+            raise RuntimeError('Failed to handle \'hello\' message. Bad reply: {0}'.format(reply))
+        app_log.info('Device protocol version is: {0}'.format(reply['ProtocolVersion']))
+        if reply['ErrorCode'] != 0:
+            raise RuntimeError('Failed to handle \'hello\' message. No common version')
 
 
     @async.coroutine
@@ -120,7 +134,7 @@ class Client:
         #
         app_log.debug('Waiting for a version exchange. Expected version is: {0}.{1}'.format(VERSION_MAJOR, VERSION_MINOR), **log_extra(self))
         reply = yield self._session.fetch()
-        if len(reply) != 3 or 'DLMessageVersionExchange' not in reply:
+        if len(reply) != 3 or reply[0] != 'DLMessageVersionExchange':
             raise RuntimeError('Version exchange failed. Bad reply: {0}'.format(reply))
         #
         major = reply[1]
@@ -130,8 +144,15 @@ class Client:
         else:
             app_log.info('Device version is: {0}.{1}'.format(major, minor), **log_extra(self))
         #
-        reply = yield self._session.fetch(device_link.create_device_link_message_dl_version_ok(VERSION_MAJOR, VERSION_MINOR))
+        reply = yield self._session.fetch(device_link.create_message_dl_version_ok(VERSION_MAJOR, VERSION_MINOR))
         if 'DLMessageDeviceReady' not in reply:
             raise RuntimeError('Version exchange failed. The expected version is not accepted.'.format(reply))
         #
         app_log.info('The expected version is accepted.', **log_extra(self))
+
+    @async.coroutine
+    def _device_link_process_message(self, message):
+        reply = yield self._session.fetch(device_link.create_message_process_message(message))
+        if len(reply) != 2 or reply[0] != 'DLMessageProcessMessage':
+            raise RuntimeError('Failed to process message via device link. Bad reply: {0}'.format(reply))
+        return reply[1]
