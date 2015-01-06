@@ -46,7 +46,7 @@ class InternalSession:
     @async.coroutine
     def fetch(self, msg=None):
         if msg:
-            data = plistlib.dumps(msg)
+            data = plistlib.dumps(msg, fmt=plistlib.FMT_BINARY)
             header_data = device_link.Header(len(data)).encode()
             #
             self._channel.write(header_data)
@@ -58,18 +58,13 @@ class InternalSession:
         if header.size > self.MAX_REPLY_SIZE:
             raise RuntimeError('Lockdown header size is too big!')
 
-    # def _validate_message(self, msg):
-    #     if 'Request' not in msg:
-    #         raise RuntimeError('Message does not contain a \'Request\' field.')
-
     @async.coroutine
     def _read_message(self):
         header_data = yield self._channel.read_async(device_link.Header.SIZE)
         header = device_link.Header.decode(header_data)
         self._validate_header(header)
         data = yield self._channel.read_async(header.size)
-        message = plistlib.loads(data)
-#        self._validate_message(message)
+        message = plistlib.loads(data, fmt=plistlib.FMT_BINARY)
         return message
 
     def enable_ssl(self, cert, key):
