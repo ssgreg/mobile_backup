@@ -46,8 +46,11 @@ class InternalSession:
     @async.coroutine
     def fetch(self, msg=None):
         if msg:
-            request_data = plistlib.dumps(msg)
-            self._channel.write(request_data)
+            data = plistlib.dumps(msg)
+            header_data = device_link.Header(len(data)).encode()
+            #
+            self._channel.write(header_data)
+            self._channel.write(data)
         #
         return (yield self._read_message())
 
@@ -55,18 +58,18 @@ class InternalSession:
         if header.size > self.MAX_REPLY_SIZE:
             raise RuntimeError('Lockdown header size is too big!')
 
-    def _validate_message(self, msg):
-        if 'Request' not in msg:
-            raise RuntimeError('Message does not contain a \'Request\' field.')
+    # def _validate_message(self, msg):
+    #     if 'Request' not in msg:
+    #         raise RuntimeError('Message does not contain a \'Request\' field.')
 
     @async.coroutine
     def _read_message(self):
-        # header_data = yield self._channel.read_async(LockdownHeader.SIZE)
-        # header = LockdownHeader.decode(header_data)
-#        self._validate_header(header)
+        header_data = yield self._channel.read_async(device_link.Header.SIZE)
+        header = device_link.Header.decode(header_data)
+        self._validate_header(header)
         data = yield self._channel.read_async(header.size)
         message = plistlib.loads(data)
-        self._validate_message(message)
+#        self._validate_message(message)
         return message
 
     def enable_ssl(self, cert, key):
@@ -103,7 +106,7 @@ class Client:
         except Exception as e:
             self._session.stop()
             raise e
-        app_log.info('Connected to a mb2 service... Handshake is finished.', **log_extra(self))
+        app_log.info('Connected to a mb2 service. Handshake is finished.', **log_extra(self))
 
     def close(self):
         self._session.stop()
@@ -114,10 +117,21 @@ class Client:
     def _device_link_version_exchange(self):
         VERSION_MAJOR = 300
         VERSION_MINOR = 0
-
+        #
         app_log.debug('Waiting for a version exchange. Expected version is: {0}.{1}'.format(VERSION_MAJOR, VERSION_MINOR), **log_extra(self))
+        reply = yield self._session.fetch()
+        if len(reply) != 3 or 'DLMessageVersionExchange' not in reply:
+            raise RuntimeError('Version exchange failed. Bad reply: {0}'.format(reply))
+        #
+        major = reply[1]
+        minor = reply[2]
+        if major > VERSION_MAJOR or (major == VERSION_MAJOR and minor > VERSION_MINOR):
+            raise RuntimeError('Version exchange failed. Device version is: {0}.{1}'.format(major, minor))
+        else:
+            app_log.info('Device version is: {0}.{1}'.format(major, minor), **log_extra(self))
+        #
         reply = yield self._session.fetch(device_link.create_device_link_message_dl_version_ok(VERSION_MAJOR, VERSION_MINOR))
-        # #
-        # if 'Error' in reply:
-        #     raise RuntimeError('Failed to validate pair. Error: {0}'.format(reply['Error']))
-        app_log.info('Done.', **log_extra(self))
+        if 'DLMessageDeviceReady' not in reply:
+            raise RuntimeError('Version exchange failed. The expected version is not accepted.'.format(reply))
+        #
+        app_log.info('The expected version is accepted.', **log_extra(self))

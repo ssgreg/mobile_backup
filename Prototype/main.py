@@ -106,41 +106,6 @@ class TestBackup:
 
 
 # #
-# # DeviceLinkVersionExchangeWLink
-# #
-
-# class DeviceLinkVersionExchangeWLink(wl.WorkflowLink):
-#   VERSION_MAJOR = 300
-#   VERSION_MINOR = 0
-
-#   def proceed(self):
-#     logger().debug('Waiting for version exchange. Expected version is: {0}.{1}'.format(self.VERSION_MAJOR, self.VERSION_MINOR))
-#     self.data.session.on_notification = lambda x: self.blocked() or self.on_handshake(x)
-#     self.stop_next()
-
-#   def on_handshake(self, query):
-#     self.data.session.on_notification = None
-#     if 'DLMessageVersionExchange' in query and len(query) == 3:
-#       major = query[1]
-#       minor = query[2]
-#       if major > self.VERSION_MAJOR or (major > self.VERSION_MAJOR and minor > self.VERSION_MINOR):
-#         raise RuntimeError('Version exchange failed. Device version is: {0}.{1}'.format(major, minor))
-#       else:
-#         logger().debug('Device version is: {0}.{1}'.format(major, minor))
-#         self.data.session.send(device_link.create_device_link_message_dl_version_ok(major, minor), lambda x: self.blocked() or self.on_version_exchange(x))
-#         self.stop_next()
-#     else:
-#       raise RuntimeError('Version exchange failed.')
-
-#   def on_version_exchange(self, result):
-#     if 'DLMessageDeviceReady' in result:
-#       logger().debug('Done')
-#       self.next()
-#     else:
-#       raise RuntimeError('Version exchange failed.')
-
-
-# #
 # # DeviceLinkInternalProcessMessageWLink
 # #
 

@@ -250,7 +250,7 @@ class Client:
     def connect(self):
         app_log.debug('Connecting to an AFC service...', **log_extra(self))
         yield self._session.start()
-        app_log.info('Connected to an AFC service...', **log_extra(self))
+        app_log.info('Connected to an AFC service.', **log_extra(self))
         return self
 
     def close(self):

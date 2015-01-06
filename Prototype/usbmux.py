@@ -202,7 +202,7 @@ class Client:
     def connect(self):
         app_log.debug('Connecting to a usbmuxd...', **log_extra(self))
         yield self._session.start()
-        app_log.info('Connected to a usbmuxd', **log_extra(self))
+        app_log.info('Connected to a usbmuxd.', **log_extra(self))
 
     def close(self):
         self._session.stop()

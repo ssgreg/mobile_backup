@@ -169,7 +169,7 @@ class Client:
         except Exception as e:
             self._session.stop()
             raise e
-        app_log.info('Connected to a lockdown service... Handshake is finished.', **log_extra(self))
+        app_log.info('Connected to a lockdown service. Handshake is finished.', **log_extra(self))
 
     def close(self):
         self._session.stop()
