@@ -26,7 +26,6 @@ def make_channel():
         return SocketChannel(address=('127.0.0.1', 27015))
 
 
-
 #
 # TestGetDeviceList
 #
@@ -103,55 +102,6 @@ class TestBackup:
                 # handle = yield afc_client.open_file(path='/com.apple.itunes.lock_sync', mode=afc.FileOpenMode.READ_WRITE)
                 # res = yield afc_client.lock_file(handle=handle, mode=afc.FileLockMode.EXCLUSIVE)
                 # res = yield afc_client.lock_file(handle=handle, mode=afc.FileLockMode.UNLOCK)
-
-
-# #
-# # DeviceLinkInternalProcessMessageWLink
-# #
-
-# class DeviceLinkInternalProcessMessageWLink(wl.WorkflowLink):
-#   def proceed(self):
-#     logger().debug('DeviceLinkIntern565alProcessMessageWLink: Processing message...')
-#     self.data.session.send(device_link.create_device_link_message_process_message(self.data.message), lambda x: self.blocked() or self.on_process_message(x))
-#     self.stop_next()
-
-#   def on_process_message(self, result):
-#     if result[0] == 'DLMessageProcessMessage' and len(result) == 2:
-#       logger().debug('DeviceLinkInternalProcessMessageWLink: Done')
-#       self.data.process_result = result[1]
-#       self.next()
-#     else:
-#       raise RuntimeError('DeviceLinkInternalProcessMessageWLink: Incorrect reply')
-
-
-# #
-# # DeviceLinkService
-# #
-
-
-# #
-# # MobileBackup2InternalHelloWLink
-# #
-
-# class MobileBackup2InternalHelloWLink(wl.WorkflowLink):
-#   def proceed(self):
-#     versions = [2.0, 2.1]
-#     logger().debug('MobileBackup2InternalHelloWLink: Sending Hello message. Supported protocol version are: {0}...'.format(versions))
-#     self.data.device_link.process_message(mobilebackup2.create_mobilebackup2_message_hello(versions), lambda: self.blocked() or self.on_hello())
-#     self.stop_next()
-
-#   def on_hello(self):
-#     result = self.data.process_result
-#     if 'MessageName' in result and result['MessageName'] == 'Response':
-#       logger().debug('MobileBackup2InternalHelloWLink: Hello reply. Protocol version is {0}'.format(result['ProtocolVersion']))
-#       if result['ErrorCode'] == 0:
-#         self.next()
-#       else:
-#         raise RuntimeError('MobileBackup2InternalHelloWLink: No common version')
-#     else:
-#       raise RuntimeError('MobileBackup2InternalHelloWLink: Incorrect reply')
-
-
 
 
 def configure_argparse():
