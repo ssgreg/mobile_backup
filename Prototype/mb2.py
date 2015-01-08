@@ -193,6 +193,17 @@ class Client:
         self._device_link_send_status_response(status2=free_space)
         app_log.info('Sent free disk space: {0}'.format(sizeof_fmt(free_space)), **log_extra(self))
 
+    def send_create_directory(self, folder, directory):
+        app_log.debug('Trying to create directory \'{0}\'...'.format(directory), **log_extra(self))
+        try:
+            os.makedirs(os.path.join(folder, directory), exist_ok=True)
+        except OSError as e:
+            self._device_link_send_status_response(code=-e.errno, status1=e.strerror)
+            app_log.info('Failed to create directory \'{0}\'.'.format(directory), **log_extra(self))
+        else:
+            self._device_link_send_status_response()
+            app_log.info('Directory \'{0}\' is created.'.format(directory), **log_extra(self))
+
     def _send_file(self, folder, file):
         app_log.debug('Sending file \'{0}\' back to service...'.format(file), **log_extra(self))
         self._session.send_raw(_pack_string(file))
