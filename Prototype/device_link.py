@@ -25,15 +25,17 @@ def create_message_process_message(message):
   ]
 
 
-def create_message_status_response(code=0, descr=None, descr_value={}):
-    msg = [
+def create_message_status_response(code=0, status1=None, status2=None):
+    if not status1:
+        status1 = '___EmptyParameterString___'
+    if not status2:
+        status2 = '___EmptyParameterString___'
+    return [
         'DLMessageStatusResponse',
         code,
+        status1,
+        status2,
     ]
-    if descr:
-        msg.append(descr)
-    msg.append(descr_value)
-    return msg
 
 
 #

@@ -87,6 +87,10 @@ class TestBackup:
                         mb2_client.send_files(folder, reply[1])
                     if reply[0] == 'DLContentsOfDirectory':
                         mb2_client.send_directory_contents(folder, reply[1])
+                    if reply[0] == 'DLMessageGetFreeDiskSpace':
+                        mb2_client.send_free_disk_space(folder)
+                    if reply[0] == 'DLMessageCreateDirectory':
+                        pass
 
             # res = yield object.get_value('com.apple.mobile.backup', 'WillEncrypt')
             # print(res)

@@ -17,7 +17,7 @@ import datetime
 import async
 import device_link
 from logger import app_log
-from tools import log_extra
+from tools import log_extra, sizeof_fmt
 
 
 MB2_SERVICE_TYPE = 'com.apple.mobilebackup2'
@@ -181,8 +181,17 @@ class Client:
             description['DLFileModificationDate'] = datetime.datetime.fromtimestamp(st.st_mtime)
             #
             content[element] = description
-        self._device_link_send_status_response(0, '___EmptyParameterString___', content)
+        self._device_link_send_status_response(status2=content)
         app_log.info('Content of dir \'{0}\' is sent back to service. {1} elements was found'.format(directory, count), **log_extra(self))
+
+    def send_free_disk_space(self, folder):
+        app_log.debug('Sending free disk space...', **log_extra(self))
+        # getting free space available for the current user
+        statvfs = os.statvfs(folder)
+        free_space = statvfs.f_frsize * statvfs.f_bavail
+        #
+        self._device_link_send_status_response(status2=free_space)
+        app_log.info('Sent free disk space: {0}'.format(sizeof_fmt(free_space)), **log_extra(self))
 
     def _send_file(self, folder, file):
         app_log.debug('Sending file \'{0}\' back to service...'.format(file), **log_extra(self))
@@ -240,8 +249,8 @@ class Client:
         #
         app_log.info('The expected version is accepted.', **log_extra(self))
 
-    def _device_link_send_status_response(self, code, descr, descr_value):
-        self._session.send(device_link.create_message_status_response(code, descr, descr_value))
+    def _device_link_send_status_response(self, code=0, status1=None, status2=None):
+        self._session.send(device_link.create_message_status_response(code, status1, status2))
 
     def _device_link_send_process_message(self, message):
         self._session.send(device_link.create_message_process_message(message))
