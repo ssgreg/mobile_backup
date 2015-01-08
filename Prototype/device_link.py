@@ -17,11 +17,23 @@ def create_message_dl_version_ok(major, minor):
     major
   ]
 
+
 def create_message_process_message(message):
   return [
     'DLMessageProcessMessage',
     message
   ]
+
+
+def create_message_status_response(code=0, descr=None, descr_value={}):
+    msg = [
+        'DLMessageStatusResponse',
+        code,
+    ]
+    if descr:
+        msg.append(descr)
+    msg.append(descr_value)
+    return msg
 
 
 #
