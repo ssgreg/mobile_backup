@@ -29,7 +29,7 @@ def create_message_status_response(code=0, status1=None, status2=None):
     if not status1:
         status1 = '___EmptyParameterString___'
     if not status2:
-        status2 = '___EmptyParameterString___'
+        status2 = dict()
     return [
         'DLMessageStatusResponse',
         code,

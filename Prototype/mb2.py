@@ -13,6 +13,7 @@ import os
 import stat
 import os.path
 import datetime
+import shutil
 #
 import async
 import device_link
@@ -82,6 +83,10 @@ class InternalSession:
         #
         self._channel.write(header_data)
         self._channel.write(data)
+
+    @async.coroutine
+    def receive_raw(self, size):
+        return (yield self._channel.read_async(size))
 
     @async.coroutine
     def receive(self):
@@ -220,6 +225,84 @@ class Client:
     @async.coroutine
     def receive_message(self):
         return (yield self._session.receive())
+
+    @async.coroutine
+    def upload_files(self, folder):
+        app_log.debug('Uploading files...', **log_extra(self))
+        while True:
+            bytes = yield self._session.receive_raw(4)
+            name_len = struct.unpack_from('>I', bytes)[0]
+            if name_len == 0:
+                break
+            bytes = yield self._session.receive_raw(name_len)
+            on_device_name = bytes.decode('utf-8')
+
+            bytes = yield self._session.receive_raw(4)
+            name_len = struct.unpack_from('>I', bytes)[0]
+            bytes = yield self._session.receive_raw(name_len)
+            original_name = bytes.decode('utf-8')
+            #
+            yield self._upload_file(folder, original_name)
+        self._device_link_send_status_response()
+        app_log.info('All files are uploaded...', **log_extra(self))
+
+    def move_items(self, folder, items):
+        app_log.debug('Moving items...', **log_extra(self))
+        for old_name, new_name in items.items():
+            old_item_path = os.path.join(folder, old_name)
+            new_item_path = os.path.join(folder, new_name)
+            if os._exists(new_item_path):
+                st = os.stat(new_item_path)
+                # file type
+                if stat.S_ISREG(st.st_mode):
+                    os.remove(new_item_path)
+                elif stat.S_ISDIR(st.st_mode):
+                    shutil.rmtree(new_item_path)
+            shutil.move(old_item_path, new_item_path)
+        # TODO: check result
+        self._device_link_send_status_response()
+        app_log.info('All items are moved', **log_extra(self))
+
+    def remove_items(self, folder, items):
+        app_log.debug('Removing items...', **log_extra(self))
+        for item in items:
+            item_path = os.path.join(folder, item)
+            if os._exists(item_path):
+                st = os.stat(item_path)
+                # file type
+                if stat.S_ISREG(st.st_mode):
+                    os.remove(item_path)
+                elif stat.S_ISDIR(st.st_mode):
+                    shutil.rmtree(item_path)
+        self._device_link_send_status_response()
+        app_log.info('All items are removed', **log_extra(self))
+
+    def finish_backup(self):
+        app_log.debug('Finishing backup...', **log_extra(self))
+        # TODO: check result
+        self._device_link_send_status_response()
+        app_log.info('Backup is finished.', **log_extra(self))
+
+    @async.coroutine
+    def _upload_file(self, folder, name):
+        app_log.debug('Uploading file \'{0}\'...'.format(name), **log_extra(self))
+        path = os.path.join(folder, name)
+        with open(path, 'wb+') as f:
+            while True:
+                size = struct.unpack_from('>I', (yield self._session.receive_raw(4)))[0]
+                if size == 0:
+                    break
+                code = struct.unpack_from('>B', (yield self._session.receive_raw(1)))[0]
+                if code == 0x0b:
+                    msg = yield self._session.receive_raw(size - 1)
+                    print(msg.decode('ascii'))
+                elif code == 0x0c:
+                    block = yield self._session.receive_raw(size - 1)
+                    f.write(block)
+                else:
+                    break
+        app_log.debug('File \'{0}\' is uploaded.'.format(name), **log_extra(self))
+
 
     @async.coroutine
     def _hello(self):

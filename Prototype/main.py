@@ -92,7 +92,19 @@ class TestBackup:
                     if reply[0] == 'DLMessageCreateDirectory':
                         mb2_client.send_create_directory(folder, reply[1])
                     if reply[0] == 'DLMessageUploadFiles':
+                        yield mb2_client.upload_files(folder)
+                    if reply[0] == 'DLMessageMoveItems':
+                        mb2_client.move_items(folder, reply[1])
+                    if reply[0] == 'DLMessageRemoveItems':
+                        mb2_client.remove_items(folder, reply[1])
+                    if reply[0] == 'DLMessageProcessMessage':
+                        mb2_client.finish_backup()
+                    if reply[0] == 'DLMessageDisconnect':
                         break
+                    if reply[0] == 'DLMessageCopyItem':
+                        break
+
+            # /var/mobile/Library/SMS/Attachments/68/08/B6C6C532-29D4-4C72-9847-580CBE937360/\xd0\x9c\xd0\xb0\xd0\xbb\xd1\x8b\xd1\x88.m4a'
 
             # res = yield object.get_value('com.apple.mobile.backup', 'WillEncrypt')
             # print(res)
