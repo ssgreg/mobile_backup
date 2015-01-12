@@ -38,7 +38,7 @@ class DeviceWaiter:
 
 
     def on_attached(self, device):
-        if device.sn == self._sn and device.connection_type == self._connection_type :
+        if device.sn == self._sn and device.connection_type == self._connection_type:
             self._future.set_result(device)
 
 
@@ -110,6 +110,75 @@ class UsbMuxDirectory:
     def _make_channel_to_port(self, did, port):
         with (yield self._make_usbmux_client()) as service:
             return (yield service.turn_to_tunnel_to_device_service(did, port))
+
+
+#
+# SingleDeviceDirectory
+#
+
+class SingleDeviceDirectory:
+    def __init__(self, channel_factory, sn, buid, pair_record):
+        self._channel_factory = channel_factory
+        self._sn = sn
+        self._buid = buid
+        self._pair_record = pair_record
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, type, value, traceback):
+        self.close()
+
+    def close(self):
+        pass
+
+    @staticmethod
+    @async.coroutine
+    def make(channel_factory, sn, buid, pair_record):
+        directory = SingleDeviceDirectory(channel_factory, sn, buid, pair_record)
+        yield directory.open(channel_factory)
+        return directory
+
+    @async.coroutine
+    def open(self, channel_factory):
+        app_log.info('Trying to open directory...', **log_extra(self))
+        # self._usbmux_client = yield self._make_usbmux_client()
+        # try:
+        #     self._buid = yield self._usbmux_client.read_buid()
+        # except Exception as e:
+        #     self._usbmux_client.close()
+        #     raise e
+        app_log.debug('The directory is opened.', **log_extra(self))
+
+    @async.coroutine
+    def objects(self):
+        return self._make_object()
+
+    @async.coroutine
+    def wait_for_object(self, sn, connection_type=TYPE_NETWORK):
+        app_log.debug('Waiting for an object with sn={0}, type={1}'.format(sn, connection_type), **log_extra(self))
+        if connection_type == TYPE_USB:
+            raise RuntimeError('Unsupported connection type.')
+        if sn != self._sn:
+            raise RuntimeError('Invalid serial number.')
+        waiter = DeviceWaiter(sn, connection_type)
+
+        channel = yield self._make_channel(0, lockdown.LOCKDOWN_SERVICE_PORT)
+        channel.close()
+
+        object = self._make_object()
+        app_log.info('Done. Object={0}'.format(object), **log_extra(self))
+        return object
+
+    @async.coroutine
+    def _make_channel(self, did, port):
+        channel =  self._channel_factory(port)
+        yield channel.connect_async()
+        return channel
+
+    def _make_object(self):
+        info = dict(DeviceID=0, Properties=dict(SerialNumber=self._sn, ConnectionType=TYPE_NETWORK))
+        return Object(usbmux.Device(info), self._buid, self._pair_record, self._make_channel)
 
 
 #

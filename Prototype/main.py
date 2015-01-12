@@ -27,6 +27,10 @@ def make_channel():
         return SocketChannel(address=('127.0.0.1', 27015))
 
 
+def make_network_channel(port):
+    return SocketChannel(address=('10.0.1.21', port))
+
+
 #
 # TestGetDeviceList
 #
@@ -74,7 +78,15 @@ class TestBackup:
 
     @async.coroutine
     def start(self):
-        with (yield mb.UsbMuxDirectory.make(make_channel)) as directory:
+        sn = 'b73fdfc17e123639a21c8ed9d65dcede6253286d'
+        buid = 'DE366373-309C-42BC-A0C3-4EA67FC8EB08'
+        pair_record = dict()
+        with open('/Users/igreg/Documents/pair_record', 'r') as f:
+            data = f.read()
+            pair_record = eval(data)
+
+        with (yield mb.SingleDeviceDirectory.make(make_network_channel, sn, buid, pair_record)) as directory:
+#        with (yield mb.UsbMuxDirectory.make(make_channel)) as directory:
             object = yield directory.wait_for_object(self.sn, connection_type=mb.TYPE_NETWORK)
             print(object)
 
