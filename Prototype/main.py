@@ -86,8 +86,8 @@ class TestBackup:
             data = f.read()
             pair_record = eval(data)
 
-        with (yield mb.SingleDeviceDirectory.make(make_network_channel, sn, buid, pair_record)) as directory:
-#        with (yield mb.UsbMuxDirectory.make(make_channel)) as directory:
+#        with (yield mb.SingleDeviceDirectory.make(make_network_channel, sn, buid, pair_record)) as directory:
+        with (yield mb.UsbMuxDirectory.make(make_channel)) as directory:
             object = yield directory.wait_for_object(self.sn, connection_type=mb.TYPE_NETWORK)
             print(object)
 
