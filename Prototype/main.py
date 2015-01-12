@@ -38,8 +38,8 @@ def make_network_channel(port):
 class TestGetDeviceList:
     @async.coroutine
     def start(self):
-        usbmux_client = yield usbmux.Client.connect(make_channel)
-        devices = yield self.usbmux_client.list_devices()
+        usbmux_client = yield usbmux.Client.make(make_channel)
+        devices = yield usbmux_client.list_devices()
         [print(device) for device in devices]
         usbmux_client.close()
 
@@ -56,7 +56,7 @@ class TestListenForDevices:
     @async.coroutine
     def start(self):
         self.usbmux = yield usbmux.Client.make(make_channel)
-        yield self.usbmux.listen(self._on_attached, self._on_detached)
+        yield self.usbmux.turn_to_listen_channel(self._on_attached, self._on_detached)
 
     def _on_attached(self, device):
         print('Attached:', device)

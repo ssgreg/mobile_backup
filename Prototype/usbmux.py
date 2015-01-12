@@ -220,8 +220,6 @@ class Client:
             raise RuntimeError('Failed to list devices')
         #
         devices = [Device(x) for x in reply['DeviceList']]
-        # remove all non-USB devices
-        devices = [x for x in devices if x.connected_via_usb()]
         app_log.info('Visible devices count = {0}'.format(len(devices)), **log_extra(self))
         return devices
 
