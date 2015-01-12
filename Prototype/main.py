@@ -73,8 +73,9 @@ class TestListenForDevices:
 #
 
 class TestBackup:
-    def __init__(self, did, sn):
+    def __init__(self, path, sn):
         self.sn = sn
+        self.path = path
 
     @async.coroutine
     def start(self):
@@ -90,7 +91,7 @@ class TestBackup:
             object = yield directory.wait_for_object(self.sn, connection_type=mb.TYPE_NETWORK)
             print(object)
 
-            folder = '/Users/igreg/Documents'
+            folder = self.path
             os.makedirs(os.path.join(folder, object.sn), exist_ok=True)
 
             with (yield object.mb2_client()) as mb2_client:
@@ -158,8 +159,8 @@ def configure_argparse():
     listen_parser = subparsers.add_parser('listen', help='Listen')
     listen_parser.add_argument('--timeout', '-t', type=int, default=10, help='timeout in seconds')
     #
-    test_parser = subparsers.add_parser('test', help='Test')
-    test_parser.add_argument('--did', type=int, help='did')
+    test_parser = subparsers.add_parser('backup', help='Backup')
+    test_parser.add_argument('--path', type=str, help='path')
     test_parser.add_argument('--sn', type=str, help='sn')
     return parser
 
@@ -170,8 +171,8 @@ def command_list(args):
 def command_listen(args):
    return TestListenForDevices(args.timeout)
 
-def command_test(args):
-    return TestBackup(args.did, args.sn)
+def command_backup(args):
+    return TestBackup(args.path, args.sn)
 
 def exit_command(future, cmd):
     try:
@@ -188,7 +189,7 @@ def main():
     commands = {
         'list': command_list,
         'listen': command_listen,
-        'test': command_test
+        'backup': command_backup
     }
     args = configure_argparse().parse_args()
 
