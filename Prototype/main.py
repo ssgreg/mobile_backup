@@ -9,6 +9,7 @@
 
 import argparse
 import traceback
+import os
 #
 from ioloop import *
 from logger import app_log, enable_pretty_logging
@@ -74,15 +75,16 @@ class TestBackup:
     @async.coroutine
     def start(self):
         with (yield mb.UsbMuxDirectory.make(make_channel)) as directory:
-            object = yield directory.wait_for_object(self.sn, connection_type=mb.TYPE_USB)
+            object = yield directory.wait_for_object(self.sn, connection_type=mb.TYPE_NETWORK)
             print(object)
 
             folder = '/Users/igreg/Documents'
+            os.makedirs(os.path.join(folder, object.sn), exist_ok=True)
+
             with (yield object.mb2_client()) as mb2_client:
                 mb2_client.request_backup(object.sn, object.sn)
                 while True:
                     reply = yield mb2_client.receive_message()
-                    print(reply)
                     if reply[0] == 'DLMessageDownloadFiles':
                         mb2_client.send_files(folder, reply[1])
                     if reply[0] == 'DLContentsOfDirectory':
@@ -99,12 +101,16 @@ class TestBackup:
                         mb2_client.remove_items(folder, reply[1])
                     if reply[0] == 'DLMessageProcessMessage':
                         mb2_client.finish_backup()
+                        if 'ErrorCode' in reply[1] and reply[1]['ErrorCode'] != 0:
+                            print(reply)
+                            print('Failed to backup. Error: {0}'.format(reply[1]['ErrorDescription']))
+                        else:
+                            print('Backup successfully finished')
                     if reply[0] == 'DLMessageDisconnect':
                         break
                     if reply[0] == 'DLMessageCopyItem':
                         break
 
-            # /var/mobile/Library/SMS/Attachments/68/08/B6C6C532-29D4-4C72-9847-580CBE937360/\xd0\x9c\xd0\xb0\xd0\xbb\xd1\x8b\xd1\x88.m4a'
 
             # res = yield object.get_value('com.apple.mobile.backup', 'WillEncrypt')
             # print(res)

@@ -146,8 +146,11 @@ class Object:
     @async.coroutine
     def _make_channel_to_device_service(self, service, use_escrow_bag=False):
         with (yield lockdown.Client.make(self._pair_record, self._buid, self._make_channel_to_port)) as lockdown_client:
-            port = yield lockdown_client.start_service(service, use_escrow_bag)
-            return (yield self._make_channel_to_port(port))
+            port, ssl_needed = yield lockdown_client.start_service(service, use_escrow_bag)
+            channel = yield self._make_channel_to_port(port)
+            if ssl_needed:
+                channel.enable_ssl(self._pair_record['HostCertificate'], self._pair_record['HostPrivateKey'])
+            return channel
 
     @property
     def did(self):

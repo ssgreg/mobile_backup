@@ -220,9 +220,6 @@ class InternalSession:
             payload = yield self._channel.read_async(header.payload_size)
         return header.operation, data, payload
 
-    def enable_ssl(self, cert, key):
-        self._channel.enable_ssl(cert, key)
-
 
 #
 # Client

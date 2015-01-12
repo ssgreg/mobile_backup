@@ -77,7 +77,6 @@ class InternalSession:
         self._channel.write(bytes)
 
     def send(self, msg):
-        print(msg)
         data = plistlib.dumps(msg, fmt=plistlib.FMT_BINARY)
         header_data = device_link.Header(len(data)).encode()
         #
@@ -106,9 +105,6 @@ class InternalSession:
     def _validate_header(self, header):
         if header.size > self.MAX_REPLY_SIZE:
             raise RuntimeError('Lockdown header size is too big!')
-
-    def enable_ssl(self, cert, key):
-        self._channel.enable_ssl(cert, key)
 
 
 #
@@ -242,6 +238,7 @@ class Client:
             bytes = yield self._session.receive_raw(name_len)
             original_name = bytes.decode('utf-8')
             #
+            app_log.info('{0} -> {1}'.format(on_device_name, original_name), **log_extra(self))
             yield self._upload_file(folder, original_name)
         self._device_link_send_status_response()
         app_log.info('All files are uploaded...', **log_extra(self))
@@ -251,7 +248,7 @@ class Client:
         for old_name, new_name in items.items():
             old_item_path = os.path.join(folder, old_name)
             new_item_path = os.path.join(folder, new_name)
-            if os._exists(new_item_path):
+            if os.path.exists(new_item_path):
                 st = os.stat(new_item_path)
                 # file type
                 if stat.S_ISREG(st.st_mode):
@@ -267,7 +264,7 @@ class Client:
         app_log.debug('Removing items...', **log_extra(self))
         for item in items:
             item_path = os.path.join(folder, item)
-            if os._exists(item_path):
+            if os.path.exists(item_path):
                 st = os.stat(item_path)
                 # file type
                 if stat.S_ISREG(st.st_mode):

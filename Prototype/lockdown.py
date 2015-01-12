@@ -187,8 +187,9 @@ class Client:
             else:
                 raise RuntimeError('Failed to start service. Error: {0}'.format(reply['Error']))
         port = reply['Port']
-        app_log.info('Done. Port={0}'.format(port), **log_extra(self))
-        return port
+        ssl_needed = True if 'EnableServiceSSL' in reply and reply['EnableServiceSSL'] == True else False
+        app_log.info('Done. Port={0}, ssl_needed={1}'.format(port, ssl_needed), **log_extra(self))
+        return port, ssl_needed
 
     @async.coroutine
     def get_value(self, domain=None, key=None):
